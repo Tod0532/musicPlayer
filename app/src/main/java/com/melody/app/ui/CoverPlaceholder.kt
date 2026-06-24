@@ -2,6 +2,7 @@ package com.melody.app.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -17,7 +18,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
 /**
- * 封面占位组件（渐变色 + 音符图标）
+ * 封面占位组件（升级版：多层渐变 + 对角高光 + 音符图标）
  * 真实 APP 用 Coil 加载真实封面
  */
 @Composable
@@ -33,16 +34,62 @@ fun CoverPlaceholder(
             .clip(RoundedCornerShape(cornerRadius))
             .background(
                 brush = Brush.linearGradient(
-                    colors = listOf(startColor, endColor)
+                    colors = listOf(
+                        startColor,
+                        blendColor(startColor, endColor, 0.5f),
+                        endColor
+                    )
                 )
             ),
         contentAlignment = Alignment.Center
     ) {
+        // 对角线高光（模拟封面光泽）
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    brush = Brush.linearGradient(
+                        colors = listOf(
+                            Color.White.copy(alpha = 0.25f),
+                            Color.White.copy(alpha = 0.0f),
+                            Color.White.copy(alpha = 0.0f)
+                        ),
+                        start = androidx.compose.ui.geometry.Offset(0f, 0f),
+                        end = androidx.compose.ui.geometry.Offset(1000f, 1000f)
+                    )
+                )
+        )
+        // 底部暗影（增加立体感）
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    brush = Brush.verticalGradient(
+                        colors = listOf(
+                            Color.Transparent,
+                            Color.Black.copy(alpha = 0.15f)
+                        )
+                    )
+                )
+        )
         Icon(
             imageVector = Icons.Filled.MusicNote,
             contentDescription = null,
-            tint = Color.White.copy(alpha = 0.85f),
+            tint = Color.White.copy(alpha = 0.9f),
             modifier = Modifier.size(iconSize)
         )
     }
+}
+
+/**
+ * 颜色混合工具
+ */
+private fun blendColor(c1: Color, c2: Color, ratio: Float): Color {
+    val r = ratio.coerceIn(0f, 1f)
+    return Color(
+        red = c1.red + (c2.red - c1.red) * r,
+        green = c1.green + (c2.green - c1.green) * r,
+        blue = c1.blue + (c2.blue - c1.blue) * r,
+        alpha = c1.alpha + (c2.alpha - c1.alpha) * r
+    )
 }

@@ -16,21 +16,24 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.QueueMusic
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.QueueMusic
 import androidx.compose.material.icons.filled.Repeat
 import androidx.compose.material.icons.filled.RepeatOne
 import androidx.compose.material.icons.filled.Shuffle
@@ -46,6 +49,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
@@ -97,7 +101,8 @@ fun PlayerScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(top = 48.dp, bottom = 24.dp, start = 24.dp, end = 24.dp)
+                .windowInsetsPadding(WindowInsets.statusBars)
+                .padding(top = 16.dp, bottom = 24.dp, start = 24.dp, end = 24.dp)
         ) {
             PlayerTopBar(song = song, onClose = onClose)
             Spacer(modifier = Modifier.height(24.dp))
@@ -199,10 +204,17 @@ private fun CoverWithRotation(song: Song, isPlaying: Boolean, modifier: Modifier
     CoverPlaceholder(
         startColor = Color(song.coverColor),
         endColor = Color(song.coverColor2),
-        cornerRadius = 20.dp,
-        iconSize = 70.dp,
+        cornerRadius = 24.dp,
+        iconSize = 80.dp,
         modifier = modifier
-            .size(240.dp)
+            .size(260.dp)
+            .shadow(
+                elevation = 30.dp,
+                shape = RoundedCornerShape(24.dp),
+                clip = false,
+                ambientColor = Color(song.coverColor).copy(alpha = 0.5f),
+                spotColor = Color(song.coverColor2).copy(alpha = 0.6f)
+            )
             .rotate(actualRotation)
     )
 }
@@ -361,7 +373,7 @@ private fun ControlRow(
                 .clickable(onClick = onNext)
         )
         Icon(
-            imageVector = Icons.Filled.QueueMusic,
+            imageVector = Icons.AutoMirrored.Filled.QueueMusic,
             contentDescription = "队列",
             tint = Color.White.copy(alpha = 0.7f),
             modifier = Modifier

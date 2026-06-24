@@ -16,9 +16,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.windowInsetsPadding
 import com.melody.app.domain.model.Song
 import com.melody.app.ui.CoverPlaceholder
 import com.melody.app.ui.formatDuration
@@ -37,19 +41,25 @@ fun MyMusicScreen(
         modifier = modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
+            .windowInsetsPadding(WindowInsets.statusBars)
     ) {
         // 顶部标题
         Text(
             text = "我的音乐",
             style = MaterialTheme.typography.headlineLarge,
-            modifier = Modifier.padding(start = 20.dp, top = 24.dp, bottom = 8.dp)
+            modifier = Modifier.padding(start = 20.dp, top = 16.dp, bottom = 4.dp)
+        )
+        Text(
+            text = "共 ${songs.size} 首",
+            style = MaterialTheme.typography.bodySmall,
+            modifier = Modifier.padding(start = 20.dp, bottom = 12.dp)
         )
 
         // Tab（静态展示）
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 20.dp, vertical = 8.dp)
+                .padding(horizontal = 20.dp, vertical = 4.dp)
         ) {
             TabItem("歌曲", true)
             Spacer(modifier = Modifier.width(24.dp))
@@ -63,7 +73,7 @@ fun MyMusicScreen(
         // 歌曲列表
         LazyColumn(
             modifier = Modifier.weight(1f),
-            contentPadding = PaddingValues(vertical = 4.dp)
+            contentPadding = PaddingValues(vertical = 6.dp)
         ) {
             items(songs.size) { index ->
                 val song = songs[index]
@@ -79,21 +89,22 @@ fun MyMusicScreen(
 
 @Composable
 private fun TabItem(label: String, active: Boolean) {
-    Column {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Text(
             text = label,
             style = if (active) MaterialTheme.typography.titleMedium else MaterialTheme.typography.bodyLarge,
             color = if (active) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
-            fontWeight = if (active) FontWeight.SemiBold else FontWeight.Normal
+            fontWeight = if (active) FontWeight.Bold else FontWeight.Normal
         )
         Spacer(modifier = Modifier.height(8.dp))
         Box(
             modifier = Modifier
-                .height(2.dp)
-                .width(if (active) 24.dp else 0.dp)
-                .clip(RoundedCornerShape(1.dp))
+                .height(3.dp)
+                .width(if (active) 28.dp else 0.dp)
+                .clip(RoundedCornerShape(1.5.dp))
                 .background(MaterialTheme.colorScheme.primary)
         )
+        Spacer(modifier = Modifier.height(2.dp))
     }
 }
 
@@ -117,19 +128,26 @@ private fun SongRow(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
-            .background(if (isPlaying) MaterialTheme.colorScheme.primary.copy(alpha = 0.08f) else Color.Transparent)
-            .padding(horizontal = 20.dp, vertical = 10.dp),
+            .padding(horizontal = 20.dp, vertical = 9.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        CoverPlaceholder(
-            startColor = Color(song.coverColor),
-            endColor = Color(song.coverColor2),
-            cornerRadius = 8.dp,
-            iconSize = 18.dp,
-            modifier = Modifier.size(44.dp)
-        )
+        Box(modifier = Modifier.size(48.dp)) {
+            CoverPlaceholder(
+                startColor = Color(song.coverColor),
+                endColor = Color(song.coverColor2),
+                cornerRadius = 10.dp,
+                iconSize = 20.dp,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .shadow(
+                        elevation = 4.dp,
+                        shape = RoundedCornerShape(10.dp),
+                        clip = false
+                    )
+            )
+        }
 
-        Spacer(modifier = Modifier.width(12.dp))
+        Spacer(modifier = Modifier.width(14.dp))
 
         Column(modifier = Modifier.weight(1f)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -138,7 +156,7 @@ private fun SongRow(
                         imageVector = Icons.Filled.PlayArrow,
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(14.dp)
+                        modifier = Modifier.size(13.dp)
                     )
                     Spacer(modifier = Modifier.width(4.dp))
                 }
@@ -151,16 +169,23 @@ private fun SongRow(
                 )
             }
             Text(
-                text = "${song.artist} · ${formatDuration(song.duration)}",
+                text = "${song.artist} · ${song.album}",
                 style = MaterialTheme.typography.bodySmall,
-                modifier = Modifier.padding(top = 2.dp)
+                modifier = Modifier.padding(top = 3.dp)
             )
         }
+
+        Text(
+            text = formatDuration(song.duration),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+            modifier = Modifier.padding(end = 8.dp)
+        )
 
         Icon(
             imageVector = Icons.Filled.MoreVert,
             contentDescription = "更多",
-            tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+            tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
             modifier = Modifier
                 .size(20.dp)
                 .clickable { }
