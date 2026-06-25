@@ -1,68 +1,222 @@
 package com.melody.app.ui
 
-import androidx.lifecycle.ViewModel
+import android.app.Application
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.melody.app.data.MusicScanner
 import com.melody.app.data.SampleData
+import com.melody.app.data.online.OnlineMusicSource
 import com.melody.app.domain.model.LyricLine
 import com.melody.app.domain.model.PlayMode
 import com.melody.app.domain.model.PlayState
 import com.melody.app.domain.model.Song
+import com.melody.app.media.MusicPlayerController
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /**
  * 播放器 UI 状态
  */
 data class PlayerUiState(
-    val songs: List<Song> = SampleData.songs,
+    val songs: List<Song> = SampleData.songs,   // 默认显示内置示例
     val currentIndex: Int = 0,
     val playState: PlayState = PlayState.PAUSED,
     val playMode: PlayMode = PlayMode.SEQUENCE,
     val currentPosition: Long = 0L,     // 毫秒
+    val duration: Long = 0L,            // 当前歌曲真实时长
     val isFullScreenPlayer: Boolean = false,
-    val lyrics: List<LyricLine> = SampleData.sampleLyrics
+    val lyrics: List<LyricLine> = SampleData.sampleLyrics,
+    val isScanning: Boolean = false,    // 是否正在扫描
+    val hasPermission: Boolean = false, // 是否已获得读取权限
+    val searchQuery: String = "",       // 在线搜索关键词
+    val searchResults: List<com.melody.app.data.online.SearchResult> = emptyList(),  // 搜索结果（带播放链接）
+    val isSearching: Boolean = false,   // 是否正在搜索
+    val currentTab: Int = 0             // 当前选中的 Tab（0=我的, 1=搜索）
 ) {
-    val currentSong: Song get() = songs.getOrElse(currentIndex) { songs.first() }
+    val currentSong: Song get() = songs.getOrElse(currentIndex) { songs.firstOrNull() ?: Song(0, "", "", "", 0L) }
     val progress: Float
-        get() = if (currentSong.duration > 0) {
-            currentPosition.toFloat() / currentSong.duration
-        } else 0f
+        get() {
+            val d = if (duration > 0) duration else currentSong.duration
+            val p = if (d > 0) currentPosition.toFloat() / d else 0f
+            return if (p.isFinite()) p.coerceIn(0f, 1f) else 0f
+        }
 }
 
 /**
- * 主 ViewModel（模拟播放，真实 APP 接 Media3）
+ * 主 ViewModel（接 Media3 真实播放 + MediaStore 扫描）
  */
-class PlayerViewModel : ViewModel() {
+class PlayerViewModel(private val application: Application) : AndroidViewModel(application) {
 
     private val _uiState = MutableStateFlow(PlayerUiState())
     val uiState: StateFlow<PlayerUiState> = _uiState.asStateFlow()
 
+    private val playerController = MusicPlayerController(application).also { controller ->
+        controller.onPlaybackStateChanged = { isPlaying, position, duration ->
+            val state = _uiState.value
+            _uiState.value = state.copy(
+                playState = if (isPlaying) PlayState.PLAYING else PlayState.PAUSED,
+                currentPosition = position,
+                duration = duration
+            )
+        }
+        controller.onPlaybackCompleted = {
+            playNext()
+        }
+    }
+
     private var progressJob: kotlinx.coroutines.Job? = null
 
-    fun playSongAt(index: Int) {
-        progressJob?.cancel()
-        _uiState.value = _uiState.value.copy(
+    init {
+        startProgressPolling()
+    }
+
+    /**
+     * 检查并请求读取音频权限
+     * 返回 true 表示已有权限
+     */
+    fun checkPermission(): Boolean {
+        val granted = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+            application.checkSelfPermission(android.Manifest.permission.READ_MEDIA_AUDIO) ==
+                android.content.pm.PackageManager.PERMISSION_GRANTED
+        } else {
+            application.checkSelfPermission(android.Manifest.permission.READ_EXTERNAL_STORAGE) ==
+                android.content.pm.PackageManager.PERMISSION_GRANTED
+        }
+        _uiState.value = _uiState.value.copy(hasPermission = granted)
+        return granted
+    }
+
+    /**
+     * 扫描本地音乐（在 IO 线程执行）
+     * 扫描结果与内置示例合并：扫描到的真实歌曲在前，示例在后
+     */
+    fun scanLocalMusic() {
+        if (_uiState.value.isScanning) return
+        if (!checkPermission()) return
+
+        _uiState.value = _uiState.value.copy(isScanning = true)
+        viewModelScope.launch {
+            val scanned = withContext(Dispatchers.IO) {
+                MusicScanner.scan(application)
+            }
+            // 合并：扫描到的真实歌曲 + 内置示例（示例作为兜底/演示）
+            val merged = if (scanned.isNotEmpty()) scanned else SampleData.songs
+            _uiState.value = _uiState.value.copy(
+                songs = merged,
+                isScanning = false
+            )
+        }
+    }
+
+    /**
+     * 切换 Tab
+     */
+    fun switchTab(index: Int) {
+        _uiState.value = _uiState.value.copy(currentTab = index)
+    }
+
+    /**
+     * 在线搜索（开放音源）
+     */
+    fun onSearchQueryChange(query: String) {
+        _uiState.value = _uiState.value.copy(searchQuery = query)
+        // 延迟搜索（防抖），关键词非空时触发
+        searchJob?.cancel()
+        if (query.isNotBlank()) {
+            searchJob = viewModelScope.launch {
+                delay(500)  // 防抖 500ms
+                performSearch(query)
+            }
+        } else {
+            _uiState.value = _uiState.value.copy(searchResults = emptyList())
+        }
+    }
+
+    private var searchJob: kotlinx.coroutines.Job? = null
+
+    private suspend fun performSearch(query: String) {
+        _uiState.value = _uiState.value.copy(isSearching = true)
+        try {
+            val results = OnlineMusicSource.searchWithPlayUrl(query)
+            _uiState.value = _uiState.value.copy(
+                searchResults = results,
+                isSearching = false
+            )
+        } catch (e: Exception) {
+            _uiState.value = _uiState.value.copy(isSearching = false)
+        }
+    }
+
+    /**
+     * 播放在线搜索结果中的歌曲（用返回的 playUrl 流式播放）
+     */
+    fun playSearchResult(index: Int) {
+        val state = _uiState.value
+        val results = state.searchResults
+        val result = results.getOrNull(index) ?: return
+        // 将搜索结果转为 Song 并设为播放列表
+        val songs = results.map { it.toSong() }
+        _uiState.value = state.copy(
+            songs = songs,
             currentIndex = index,
             playState = PlayState.PLAYING,
-            currentPosition = 0L
+            currentPosition = 0L,
+            isFullScreenPlayer = true,
+            duration = result.duration
         )
-        startProgressSimulation()
+        // 用返回的 playUrl 流式播放
+        playerController.playUri(result.playUrl)
+    }
+
+    fun playSongAt(index: Int) {
+        val state = _uiState.value
+        val song = state.songs.getOrNull(index) ?: return
+        _uiState.value = state.copy(
+            currentIndex = index,
+            playState = PlayState.PLAYING,
+            currentPosition = 0L,
+            isFullScreenPlayer = true,
+            duration = song.duration
+        )
+        // 根据来源选择播放方式
+        when {
+            song.audioAsset != null -> playerController.play(song.audioAsset)
+            song.mediaUri != null -> playerController.playUri(song.mediaUri)
+            else -> playerController.stop()  // 无音频源
+        }
     }
 
     fun togglePlayPause() {
         val state = _uiState.value
-        val newState = if (state.playState == PlayState.PLAYING) PlayState.PAUSED else PlayState.PLAYING
-        _uiState.value = state.copy(playState = newState)
-        if (newState == PlayState.PLAYING) startProgressSimulation() else progressJob?.cancel()
+        if (state.playState == PlayState.PLAYING) {
+            _uiState.value = state.copy(playState = PlayState.PAUSED)
+            playerController.pause()
+        } else {
+            // 恢复播放：如果当前歌曲有音频且未加载，重新播放
+            val song = state.currentSong
+            if (song.audioAsset != null && state.currentPosition == 0L) {
+                playerController.play(song.audioAsset)
+            } else {
+                _uiState.value = state.copy(playState = PlayState.PLAYING)
+                playerController.resume()
+            }
+        }
+    }
+
+    fun toggleFullScreenPlayer() {
+        _uiState.value = _uiState.value.copy(isFullScreenPlayer = !_uiState.value.isFullScreenPlayer)
     }
 
     fun playNext() {
         val state = _uiState.value
         val nextIndex = when (state.playMode) {
             PlayMode.SHUFFLE -> (0 until state.songs.size).random()
+            PlayMode.REPEAT_ONE -> state.currentIndex  // 单曲循环
             else -> (state.currentIndex + 1) % state.songs.size
         }
         playSongAt(nextIndex)
@@ -86,10 +240,7 @@ class PlayerViewModel : ViewModel() {
 
     fun seekTo(position: Long) {
         _uiState.value = _uiState.value.copy(currentPosition = position)
-    }
-
-    fun toggleFullScreenPlayer() {
-        _uiState.value = _uiState.value.copy(isFullScreenPlayer = !_uiState.value.isFullScreenPlayer)
+        playerController.seekTo(position)
     }
 
     fun closeFullScreenPlayer() {
@@ -104,18 +255,32 @@ class PlayerViewModel : ViewModel() {
         _uiState.value = state.copy(songs = updated)
     }
 
-    private fun startProgressSimulation() {
+    /**
+     * 定时轮询真实播放进度（ExoPlayer 不主动推送 position 变化）
+     */
+    private fun startProgressPolling() {
         progressJob = viewModelScope.launch {
-            while (_uiState.value.playState == PlayState.PLAYING) {
-                delay(500)
+            while (true) {
+                delay(300)
                 val state = _uiState.value
-                val newPos = state.currentPosition + 500
-                if (newPos >= state.currentSong.duration) {
-                    playNext()
-                } else {
-                    _uiState.value = state.copy(currentPosition = newPos)
+                if (state.playState == PlayState.PLAYING) {
+                    val pos = playerController.getCurrentPosition()
+                    val dur = playerController.getDuration()
+                    // 只在有真实播放时更新位置（避免覆盖无音频歌曲的静态状态）
+                    if (state.currentSong.audioAsset != null) {
+                        _uiState.value = state.copy(
+                            currentPosition = pos,
+                            duration = if (dur > 0) dur else state.duration
+                        )
+                    }
                 }
             }
         }
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        progressJob?.cancel()
+        playerController.release()
     }
 }

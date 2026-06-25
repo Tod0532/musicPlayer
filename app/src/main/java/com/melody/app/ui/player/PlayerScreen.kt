@@ -255,7 +255,8 @@ private fun SongInfoRow(song: Song, isFavorite: Boolean, onToggleFavorite: () ->
  */
 @Composable
 private fun ProgressBar(position: Long, duration: Long, onSeek: (Long) -> Unit) {
-    val progress = if (duration > 0) (position.toFloat() / duration) else 0f
+    val rawProgress = if (duration > 0) (position.toFloat() / duration) else 0f
+    val progress = if (rawProgress.isFinite()) rawProgress.coerceIn(0f, 1f) else 0f
 
     Column(modifier = Modifier.fillMaxWidth()) {
         Box(
@@ -266,7 +267,7 @@ private fun ProgressBar(position: Long, duration: Long, onSeek: (Long) -> Unit) 
                     detectTapGestures(
                         onTap = { offset ->
                             val trackWidthPx = size.width.toFloat()
-                            if (trackWidthPx > 0) {
+                            if (trackWidthPx > 0 && duration > 0) {
                                 val ratio = (offset.x / trackWidthPx).coerceIn(0f, 1f)
                                 onSeek((duration * ratio).toLong())
                             }
@@ -283,17 +284,14 @@ private fun ProgressBar(position: Long, duration: Long, onSeek: (Long) -> Unit) 
                     .clip(RoundedCornerShape(2.dp))
                     .background(Color.White.copy(alpha = 0.15f))
             )
-            // 已播放部分
-            Row(modifier = Modifier.fillMaxWidth()) {
-                Box(
-                    modifier = Modifier
-                        .weight(progress.coerceIn(0f, 1f))
-                        .height(3.dp)
-                        .clip(RoundedCornerShape(2.dp))
-                        .background(MaterialTheme.colorScheme.primary)
-                )
-                Spacer(modifier = Modifier.weight((1f - progress).coerceIn(0f, 1f)))
-            }
+            // 已播放部分（用 fillMaxWidth(fraction)，fraction 已 coerce 防护）
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(progress)
+                    .height(3.dp)
+                    .clip(RoundedCornerShape(2.dp))
+                    .background(MaterialTheme.colorScheme.primary)
+            )
         }
         Row(
             modifier = Modifier

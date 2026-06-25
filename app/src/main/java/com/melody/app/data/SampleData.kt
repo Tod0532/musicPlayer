@@ -18,7 +18,8 @@ object SampleData {
             duration = 269000,
             coverColor = CoverColors.GRADIENT_BLUE,
             coverColor2 = CoverColors.GRADIENT_PURPLE,
-            isFavorite = true
+            isFavorite = true,
+            audioAsset = "song_qingtian.wav"
         ),
         Song(
             id = 2,
@@ -27,7 +28,8 @@ object SampleData {
             album = "七里香",
             duration = 238000,
             coverColor = CoverColors.GRADIENT_PINK,
-            coverColor2 = CoverColors.GRADIENT_ORANGE
+            coverColor2 = CoverColors.GRADIENT_ORANGE,
+            audioAsset = "song_qilixiang.wav"
         ),
         Song(
             id = 3,
@@ -36,7 +38,8 @@ object SampleData {
             album = "魔杰座",
             duration = 223000,
             coverColor = CoverColors.GRADIENT_GREEN,
-            coverColor2 = CoverColors.GRADIENT_CYAN
+            coverColor2 = CoverColors.GRADIENT_CYAN,
+            audioAsset = "song_daoxiang.wav"
         ),
         Song(
             id = 4,

@@ -35,7 +35,9 @@ fun MyMusicScreen(
     songs: List<Song>,
     currentIndex: Int,
     onSongClick: (Int) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    isScanning: Boolean = false,
+    onScanClick: () -> Unit = {}
 ) {
     Column(
         modifier = modifier
@@ -43,14 +45,49 @@ fun MyMusicScreen(
             .background(MaterialTheme.colorScheme.background)
             .windowInsetsPadding(WindowInsets.statusBars)
     ) {
-        // 顶部标题
+        // 顶部标题 + 扫描按钮
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = 20.dp, top = 16.dp, end = 20.dp, bottom = 4.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "我的音乐",
+                style = MaterialTheme.typography.headlineLarge
+            )
+            // 扫描按钮
+            Row(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f))
+                    .clickable(onClick = onScanClick)
+                    .padding(horizontal = 12.dp, vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                if (isScanning) {
+                    androidx.compose.material3.CircularProgressIndicator(
+                        modifier = Modifier.size(14.dp),
+                        strokeWidth = 2.dp,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+                androidx.compose.foundation.layout.Spacer(modifier = Modifier.width(6.dp))
+                Text(
+                    text = if (isScanning) "扫描中" else "扫描音乐",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+        }
         Text(
-            text = "我的音乐",
-            style = MaterialTheme.typography.headlineLarge,
-            modifier = Modifier.padding(start = 20.dp, top = 16.dp, bottom = 4.dp)
-        )
-        Text(
-            text = "共 ${songs.size} 首",
+            text = when {
+                isScanning -> "正在扫描本地音乐..."
+                songs.isNotEmpty() -> "共 ${songs.size} 首歌曲"
+                else -> "暂无音乐"
+            },
             style = MaterialTheme.typography.bodySmall,
             modifier = Modifier.padding(start = 20.dp, bottom = 12.dp)
         )

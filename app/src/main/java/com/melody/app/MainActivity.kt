@@ -1,9 +1,13 @@
 package com.melody.app
 
+import android.Manifest
+import android.content.pm.PackageManager
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -11,6 +15,7 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -33,7 +38,9 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.melody.app.ui.theme.MelodyTheme
 import com.melody.app.ui.PlayerViewModel
@@ -70,6 +77,30 @@ private val tabs = listOf(
 fun MelodyApp(viewModel: PlayerViewModel = viewModel()) {
     val uiState by viewModel.uiState.collectAsState()
 
+    // 权限请求
+    val permissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { result ->
+        val granted = result.values.any { it }
+        if (granted) {
+            viewModel.scanLocalMusic()
+        }
+    }
+
+    // 请求权限的触发函数（由 UI 按钮调用，避免启动时自动弹窗的时序问题）
+    fun requestScan() {
+        if (viewModel.checkPermission()) {
+            viewModel.scanLocalMusic()
+        } else {
+            val permissions = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+                arrayOf(Manifest.permission.READ_MEDIA_AUDIO)
+            } else {
+                arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE)
+            }
+            permissionLauncher.launch(permissions)
+        }
+    }
+
     Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         Scaffold(
             containerColor = MaterialTheme.colorScheme.background,
@@ -88,11 +119,11 @@ fun MelodyApp(viewModel: PlayerViewModel = viewModel()) {
                     NavigationBar(containerColor = MaterialTheme.colorScheme.background) {
                         tabs.forEachIndexed { index, tab ->
                             NavigationBarItem(
-                                selected = index == 0, // 演示：固定在第一个 Tab
-                                onClick = { },
+                                selected = index == uiState.currentTab,
+                                onClick = { viewModel.switchTab(index) },
                                 icon = {
                                     Icon(
-                                        imageVector = if (index == 0) tab.selectedIcon else tab.unselectedIcon,
+                                        imageVector = if (index == uiState.currentTab) tab.selectedIcon else tab.unselectedIcon,
                                         contentDescription = tab.title
                                     )
                                 },
@@ -104,11 +135,29 @@ fun MelodyApp(viewModel: PlayerViewModel = viewModel()) {
             }
         ) { innerPadding ->
             Box(modifier = Modifier.padding(innerPadding)) {
-                MyMusicScreen(
-                    songs = uiState.songs,
-                    currentIndex = uiState.currentIndex,
-                    onSongClick = { index -> viewModel.playSongAt(index) }
-                )
+                when (uiState.currentTab) {
+                    0 -> MyMusicScreen(
+                        songs = uiState.songs,
+                        currentIndex = uiState.currentIndex,
+                        onSongClick = { index -> viewModel.playSongAt(index) },
+                        isScanning = uiState.isScanning,
+                        onScanClick = { requestScan() }
+                    )
+                    1 -> com.melody.app.ui.search.SearchScreen(
+                        query = uiState.searchQuery,
+                        onQueryChange = { viewModel.onSearchQueryChange(it) },
+                        results = uiState.searchResults,
+                        isSearching = uiState.isSearching,
+                        onSongClick = { index -> viewModel.playSearchResult(index) }
+                    )
+                    else -> MyMusicScreen(
+                        songs = uiState.songs,
+                        currentIndex = uiState.currentIndex,
+                        onSongClick = { index -> viewModel.playSongAt(index) },
+                        isScanning = uiState.isScanning,
+                        onScanClick = { requestScan() }
+                    )
+                }
             }
         }
 

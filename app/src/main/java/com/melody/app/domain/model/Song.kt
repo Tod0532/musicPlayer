@@ -11,7 +11,9 @@ data class Song(
     val duration: Long,        // 毫秒
     val coverColor: Long = CoverColors.GRADIENT_BLUE,  // 封面占位渐变起始色
     val coverColor2: Long = CoverColors.GRADIENT_PURPLE,
-    val isFavorite: Boolean = false
+    val isFavorite: Boolean = false,
+    val audioAsset: String? = null,   // assets 内音频文件名（内置示例曲）
+    val mediaUri: String? = null      // MediaStore content:// URI（扫描到的真实歌曲）
 )
 
 /**
