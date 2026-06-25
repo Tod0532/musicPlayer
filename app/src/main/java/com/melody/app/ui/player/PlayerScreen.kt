@@ -45,6 +45,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -107,12 +110,31 @@ fun PlayerScreen(
             PlayerTopBar(song = song, onClose = onClose)
             Spacer(modifier = Modifier.height(24.dp))
 
-            CoverWithRotation(
-                song = song,
-                isPlaying = playState == PlayState.PLAYING,
-                modifier = Modifier.align(Alignment.CenterHorizontally)
-            )
-            Spacer(modifier = Modifier.height(32.dp))
+            // 封面/歌词双视图（点击切换）
+            var showFullLyrics by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
+
+            if (!showFullLyrics) {
+                // 封面模式
+                CoverWithRotation(
+                    song = song,
+                    isPlaying = playState == PlayState.PLAYING,
+                    modifier = Modifier
+                        .align(Alignment.CenterHorizontally)
+                        .clickable { showFullLyrics = true }
+                )
+            } else {
+                // 完整歌词模式
+                FullLyricsView(
+                    lyrics = lyrics,
+                    currentPosition = currentPosition,
+                    onLyricClick = { time ->
+                        onLyricClick(time)
+                    },
+                    onClose = { showFullLyrics = false },
+                    modifier = Modifier.weight(1f)
+                )
+            }
+            Spacer(modifier = Modifier.height(if (showFullLyrics) 8.dp else 32.dp))
 
             SongInfoRow(
                 song = song,
@@ -136,14 +158,83 @@ fun PlayerScreen(
                 onNext = onNext,
                 onCycleMode = onCycleMode
             )
-            Spacer(modifier = Modifier.weight(1f))
-
-            LyricsPreview(
-                lyrics = lyrics,
-                currentPosition = currentPosition,
-                onLyricClick = onLyricClick
-            )
+            if (!showFullLyrics) {
+                Spacer(modifier = Modifier.weight(1f))
+                // 底部歌词预览（三行）
+                LyricsPreview(
+                    lyrics = lyrics,
+                    currentPosition = currentPosition,
+                    onLyricClick = onLyricClick
+                )
+            }
         }
+    }
+}
+
+/**
+ * 完整歌词视图（自动滚动 + 当前行高亮 + 点击跳转）
+ */
+@Composable
+private fun FullLyricsView(
+    lyrics: List<LyricLine>,
+    currentPosition: Long,
+    onLyricClick: (Long) -> Unit,
+    onClose: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val activeIndex = lyrics.indexOfLast { it.time <= currentPosition }.coerceAtLeast(0)
+    val listState = rememberLazyListState()
+
+    // 自动滚动到当前行（居中）
+    LaunchedEffect(activeIndex) {
+        if (lyrics.isNotEmpty() && activeIndex >= 0) {
+            listState.animateScrollToItem(index = activeIndex.coerceIn(0, lyrics.size - 1))
+        }
+    }
+
+    Box(modifier = modifier.fillMaxWidth()) {
+        LazyColumn(
+            state = listState,
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = androidx.compose.foundation.layout.PaddingValues(vertical = 120.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            items(lyrics.size) { index ->
+                val lyric = lyrics[index]
+                val isActive = index == activeIndex
+                val distance = kotlin.math.abs(index - activeIndex)
+                // 距离当前行越远越淡
+                val alpha = when {
+                    isActive -> 1f
+                    distance <= 2 -> 0.5f
+                    distance <= 5 -> 0.25f
+                    else -> 0.12f
+                }
+                Text(
+                    text = lyric.text,
+                    fontSize = if (isActive) 18.sp else 15.sp,
+                    fontWeight = if (isActive) FontWeight.Bold else FontWeight.Normal,
+                    color = if (isActive) MaterialTheme.colorScheme.primary
+                            else Color.White.copy(alpha = alpha),
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 8.dp, horizontal = 16.dp)
+                        .clickable { onLyricClick(lyric.time) }
+                )
+            }
+        }
+        // 提示：点击歌词跳转，点击空白区切回封面
+        Text(
+            text = "点击歌词跳转 · 点击封面切回",
+            style = MaterialTheme.typography.bodySmall,
+            color = Color.White.copy(alpha = 0.3f),
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = 8.dp)
+        )
     }
 }
 

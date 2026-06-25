@@ -5,12 +5,16 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.melody.app.data.MusicScanner
 import com.melody.app.data.SampleData
+import com.melody.app.data.local.MelodyDatabase
+import com.melody.app.data.local.PlaylistEntity
+import com.melody.app.data.local.PlaylistSongEntity
 import com.melody.app.data.online.OnlineMusicSource
 import com.melody.app.domain.model.LyricLine
+import com.melody.app.media.LyricsParser
 import com.melody.app.domain.model.PlayMode
 import com.melody.app.domain.model.PlayState
 import com.melody.app.domain.model.Song
-import com.melody.app.media.MusicPlayerController
+import com.melody.app.media.MediaServiceConnection
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -36,7 +40,8 @@ data class PlayerUiState(
     val searchQuery: String = "",       // 在线搜索关键词
     val searchResults: List<com.melody.app.data.online.SearchResult> = emptyList(),  // 搜索结果（带播放链接）
     val isSearching: Boolean = false,   // 是否正在搜索
-    val currentTab: Int = 0             // 当前选中的 Tab（0=我的, 1=搜索）
+    val currentTab: Int = 0,            // 当前 Tab（0=我的, 1=搜索, 2=歌单）
+    val playlists: List<PlaylistEntity> = emptyList()  // 歌单列表
 ) {
     val currentSong: Song get() = songs.getOrElse(currentIndex) { songs.firstOrNull() ?: Song(0, "", "", "", 0L) }
     val progress: Float
@@ -55,8 +60,9 @@ class PlayerViewModel(private val application: Application) : AndroidViewModel(a
     private val _uiState = MutableStateFlow(PlayerUiState())
     val uiState: StateFlow<PlayerUiState> = _uiState.asStateFlow()
 
-    private val playerController = MusicPlayerController(application).also { controller ->
-        controller.onPlaybackStateChanged = { isPlaying, position, duration ->
+    // 用 MediaServiceConnection 连接后台 Service（实现后台播放+通知栏）
+    private val mediaConnection = MediaServiceConnection(application).also { conn ->
+        conn.onPlaybackStateChanged = { isPlaying, position, duration ->
             val state = _uiState.value
             _uiState.value = state.copy(
                 playState = if (isPlaying) PlayState.PLAYING else PlayState.PAUSED,
@@ -64,15 +70,65 @@ class PlayerViewModel(private val application: Application) : AndroidViewModel(a
                 duration = duration
             )
         }
-        controller.onPlaybackCompleted = {
+        conn.onPlaybackCompleted = {
             playNext()
         }
     }
 
+    // Room 数据库（歌单管理）
+    private val database = MelodyDatabase.getInstance(application)
+    private val playlistDao = database.playlistDao()
+
     private var progressJob: kotlinx.coroutines.Job? = null
 
     init {
+        // 连接到后台播放服务
+        mediaConnection.connect()
         startProgressPolling()
+        // 观察歌单列表变化
+        viewModelScope.launch {
+            playlistDao.observePlaylists().collect { playlists ->
+                _uiState.value = _uiState.value.copy(playlists = playlists)
+            }
+        }
+    }
+
+    // ---- 歌单管理 ----
+
+    fun createPlaylist(name: String) {
+        if (name.isBlank()) return
+        viewModelScope.launch {
+            playlistDao.insertPlaylist(PlaylistEntity(name = name.trim()))
+        }
+    }
+
+    fun deletePlaylist(playlist: PlaylistEntity) {
+        viewModelScope.launch {
+            playlistDao.deletePlaylist(playlist)
+        }
+    }
+
+    /**
+     * 将当前播放的歌曲添加到指定歌单
+     */
+    fun addCurrentSongToPlaylist(playlistId: Long) {
+        val song = _uiState.value.currentSong
+        viewModelScope.launch {
+            playlistDao.addSongToPlaylist(
+                PlaylistSongEntity(
+                    playlistId = playlistId,
+                    songId = song.id,
+                    title = song.title,
+                    artist = song.artist,
+                    album = song.album,
+                    duration = song.duration,
+                    coverColor = song.coverColor,
+                    coverColor2 = song.coverColor2,
+                    audioAsset = song.audioAsset,
+                    mediaUri = song.mediaUri
+                )
+            )
+        }
     }
 
     /**
@@ -170,24 +226,32 @@ class PlayerViewModel(private val application: Application) : AndroidViewModel(a
             duration = result.duration
         )
         // 用返回的 playUrl 流式播放
-        playerController.playUri(result.playUrl)
+        mediaConnection.playUri(result.playUrl)
     }
 
     fun playSongAt(index: Int) {
         val state = _uiState.value
         val song = state.songs.getOrNull(index) ?: return
+        // 加载对应歌词（如果有 LRC 文件）
+        val lyrics = if (song.lrcAsset != null) {
+            LyricsParser.parseFromAssets(application, song.lrcAsset)
+        } else {
+            // 无歌词文件时显示占位
+            listOf(LyricLine(0, "暂无歌词"))
+        }
         _uiState.value = state.copy(
             currentIndex = index,
             playState = PlayState.PLAYING,
             currentPosition = 0L,
             isFullScreenPlayer = true,
-            duration = song.duration
+            duration = song.duration,
+            lyrics = lyrics
         )
         // 根据来源选择播放方式
         when {
-            song.audioAsset != null -> playerController.play(song.audioAsset)
-            song.mediaUri != null -> playerController.playUri(song.mediaUri)
-            else -> playerController.stop()  // 无音频源
+            song.audioAsset != null -> mediaConnection.playAsset(song.audioAsset)
+            song.mediaUri != null -> mediaConnection.playUri(song.mediaUri)
+            else -> mediaConnection.stop()  // 无音频源
         }
     }
 
@@ -195,15 +259,15 @@ class PlayerViewModel(private val application: Application) : AndroidViewModel(a
         val state = _uiState.value
         if (state.playState == PlayState.PLAYING) {
             _uiState.value = state.copy(playState = PlayState.PAUSED)
-            playerController.pause()
+            mediaConnection.pause()
         } else {
             // 恢复播放：如果当前歌曲有音频且未加载，重新播放
             val song = state.currentSong
             if (song.audioAsset != null && state.currentPosition == 0L) {
-                playerController.play(song.audioAsset)
+                mediaConnection.playAsset(song.audioAsset)
             } else {
                 _uiState.value = state.copy(playState = PlayState.PLAYING)
-                playerController.resume()
+                mediaConnection.play()
             }
         }
     }
@@ -240,7 +304,7 @@ class PlayerViewModel(private val application: Application) : AndroidViewModel(a
 
     fun seekTo(position: Long) {
         _uiState.value = _uiState.value.copy(currentPosition = position)
-        playerController.seekTo(position)
+        mediaConnection.seekTo(position)
     }
 
     fun closeFullScreenPlayer() {
@@ -264,8 +328,8 @@ class PlayerViewModel(private val application: Application) : AndroidViewModel(a
                 delay(300)
                 val state = _uiState.value
                 if (state.playState == PlayState.PLAYING) {
-                    val pos = playerController.getCurrentPosition()
-                    val dur = playerController.getDuration()
+                    val pos = mediaConnection.getCurrentPosition()
+                    val dur = mediaConnection.getDuration()
                     // 只在有真实播放时更新位置（避免覆盖无音频歌曲的静态状态）
                     if (state.currentSong.audioAsset != null) {
                         _uiState.value = state.copy(
@@ -281,6 +345,6 @@ class PlayerViewModel(private val application: Application) : AndroidViewModel(a
     override fun onCleared() {
         super.onCleared()
         progressJob?.cancel()
-        playerController.release()
+        mediaConnection.disconnect()
     }
 }
