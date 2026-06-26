@@ -14,7 +14,8 @@ data class Song(
     val isFavorite: Boolean = false,
     val audioAsset: String? = null,   // assets 内音频文件名（内置示例曲）
     val mediaUri: String? = null,     // MediaStore content:// URI（扫描到的真实歌曲）
-    val lrcAsset: String? = null      // assets 内 LRC 歌词文件名
+    val lrcAsset: String? = null,     // assets 内 LRC 歌词文件名
+    val coverUri: String? = null      // 专辑封面 content:// URI（无则用渐变占位）
 )
 
 /**

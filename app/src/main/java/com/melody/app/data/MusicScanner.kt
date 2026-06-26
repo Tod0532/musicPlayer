@@ -36,7 +36,8 @@ object MusicScanner {
             MediaStore.Audio.Media.ARTIST,
             MediaStore.Audio.Media.ALBUM,
             MediaStore.Audio.Media.DURATION,
-            MediaStore.Audio.Media.MIME_TYPE
+            MediaStore.Audio.Media.MIME_TYPE,
+            MediaStore.Audio.Media.ALBUM_ID
         )
 
         // 只查询音乐（IS_MUSIC = 1），排除铃声/通知音等
@@ -62,6 +63,8 @@ object MusicScanner {
             val artistColumn = it.getColumnIndexOrThrow(MediaStore.Audio.Media.ARTIST)
             val albumColumn = it.getColumnIndexOrThrow(MediaStore.Audio.Media.ALBUM)
             val durationColumn = it.getColumnIndexOrThrow(MediaStore.Audio.Media.DURATION)
+            // ALBUM_ID 可能在某些设备不可用，用 getColumnIndex 安全读取
+            val albumIdColumn = it.getColumnIndex(MediaStore.Audio.Media.ALBUM_ID)
 
             var index = 0
             while (it.moveToNext()) {
@@ -73,6 +76,11 @@ object MusicScanner {
                 val contentUri = ContentUris.withAppendedId(
                     collection, id
                 )
+                // 专辑封面 URI（用 ALBUM_ID 拼接 Artwork 的 contentUri）
+                val albumId = if (albumIdColumn >= 0) it.getLong(albumIdColumn) else -1L
+                val coverUri = if (albumId > 0) {
+                    "content://media/external/audio/albumart/$albumId"
+                } else null
 
                 // 跳过过短的音频（< 10 秒，可能是铃声片段）
                 if (duration < 10000) continue
@@ -87,7 +95,8 @@ object MusicScanner {
                         duration = duration,
                         coverColor = colors.first,
                         coverColor2 = colors.second,
-                        mediaUri = contentUri.toString()  // 真实歌曲的 content:// URI
+                        mediaUri = contentUri.toString(),  // 真实歌曲的 content:// URI
+                        coverUri = coverUri                // 专辑封面 URI
                     )
                 )
                 index++

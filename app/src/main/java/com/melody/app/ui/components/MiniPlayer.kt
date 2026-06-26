@@ -71,6 +71,7 @@ fun MiniPlayer(
                     endColor = Color(song.coverColor2),
                     cornerRadius = 8.dp,
                     iconSize = 16.dp,
+                    coverUri = song.coverUri,
                     modifier = Modifier.size(40.dp)
                 )
                 Spacer(modifier = Modifier.size(12.dp))

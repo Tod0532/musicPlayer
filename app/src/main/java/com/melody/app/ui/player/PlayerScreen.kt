@@ -299,6 +299,7 @@ private fun CoverWithRotation(song: Song, isPlaying: Boolean, modifier: Modifier
         endColor = Color(song.coverColor2),
         cornerRadius = 24.dp,
         iconSize = 80.dp,
+        coverUri = song.coverUri,
         modifier = modifier
             .size(260.dp)
             .shadow(

@@ -258,6 +258,7 @@ private fun SongRow(
                 endColor = Color(song.coverColor2),
                 cornerRadius = 10.dp,
                 iconSize = 20.dp,
+                coverUri = song.coverUri,
                 modifier = Modifier
                     .fillMaxSize()
                     .shadow(

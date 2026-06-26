@@ -19,7 +19,7 @@ import androidx.compose.ui.unit.dp
 
 /**
  * 封面占位组件（升级版：多层渐变 + 对角高光 + 音符图标）
- * 真实 APP 用 Coil 加载真实封面
+ * 传入 coverUri 时用 Coil 加载真实封面，无值时降级渐变占位
  */
 @Composable
 fun CoverPlaceholder(
@@ -27,7 +27,8 @@ fun CoverPlaceholder(
     startColor: Color,
     endColor: Color,
     cornerRadius: Dp = 8.dp,
-    iconSize: Dp = 24.dp
+    iconSize: Dp = 24.dp,
+    coverUri: String? = null   // 真实封面 URI（有则用 Coil 加载，无则渐变占位）
 ) {
     Box(
         modifier = modifier
@@ -72,12 +73,26 @@ fun CoverPlaceholder(
                     )
                 )
         )
-        Icon(
-            imageVector = Icons.Filled.MusicNote,
-            contentDescription = null,
-            tint = Color.White.copy(alpha = 0.9f),
-            modifier = Modifier.size(iconSize)
-        )
+        // 真实封面（有 coverUri 时用 Coil 加载，覆盖渐变占位层）
+        if (coverUri != null) {
+            coil.compose.AsyncImage(
+                model = coil.request.ImageRequest.Builder(androidx.compose.ui.platform.LocalContext.current)
+                    .data(coverUri)
+                    .crossfade(true)
+                    .build(),
+                contentDescription = null,
+                contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                modifier = Modifier.fillMaxSize()
+            )
+        } else {
+            // 无封面时显示音符图标
+            Icon(
+                imageVector = Icons.Filled.MusicNote,
+                contentDescription = null,
+                tint = Color.White.copy(alpha = 0.9f),
+                modifier = Modifier.size(iconSize)
+            )
+        }
     }
 }
 
