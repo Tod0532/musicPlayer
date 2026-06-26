@@ -75,6 +75,25 @@ class PlayerViewModel(private val application: Application) : AndroidViewModel(a
         conn.onPlaybackCompleted = {
             playNext()
         }
+        // 通知栏/锁屏点击下一首/上一首时，Player 队列自动切换，同步 UI 当前歌曲
+        conn.onQueueIndexChanged = { newIndex ->
+            val state = _uiState.value
+            val songs = state.songs
+            if (newIndex in songs.indices) {
+                val song = songs[newIndex]
+                val lyrics = if (song.lrcAsset != null) {
+                    LyricsParser.parseFromAssets(application, song.lrcAsset)
+                } else {
+                    listOf(LyricLine(0, "暂无歌词"))
+                }
+                _uiState.value = state.copy(
+                    currentIndex = newIndex,
+                    currentPosition = 0L,
+                    duration = song.duration,
+                    lyrics = lyrics
+                )
+            }
+        }
     }
 
     // Room 数据库（歌单管理）
@@ -306,11 +325,24 @@ class PlayerViewModel(private val application: Application) : AndroidViewModel(a
             duration = song.duration,
             lyrics = lyrics
         )
-        // 根据来源选择播放方式
-        when {
-            song.audioAsset != null -> mediaConnection.playAsset(song.audioAsset)
-            song.mediaUri != null -> mediaConnection.playUri(song.mediaUri)
-            else -> mediaConnection.stop()  // 无音频源
+        // 设置完整播放队列（让通知栏/锁屏显示上一首/下一首按钮）
+        val queue = state.songs.mapNotNull { s ->
+            val uri = when {
+                s.audioAsset != null -> "asset:///${s.audioAsset}"
+                s.mediaUri != null -> s.mediaUri
+                else -> return@mapNotNull null  // 跳过无音频源的
+            }
+            com.melody.app.media.QueueItem(
+                uri = uri,
+                title = s.title,
+                artist = s.artist,
+                album = s.album
+            )
+        }
+        // 队列中对应的索引（跳过无音频项后重新计数）
+        val queueIndex = state.songs.subList(0, index).count { it.audioAsset != null || it.mediaUri != null }
+        if (queue.isNotEmpty()) {
+            mediaConnection.setQueueAndPlay(queue, queueIndex)
         }
     }
 
@@ -336,19 +368,14 @@ class PlayerViewModel(private val application: Application) : AndroidViewModel(a
     }
 
     fun playNext() {
-        val state = _uiState.value
-        val nextIndex = when (state.playMode) {
-            PlayMode.SHUFFLE -> (0 until state.songs.size).random()
-            PlayMode.REPEAT_ONE -> state.currentIndex  // 单曲循环
-            else -> (state.currentIndex + 1) % state.songs.size
-        }
-        playSongAt(nextIndex)
+        // 走 Player 队列（通知栏下一首按钮也是这个路径）
+        // UI 状态由 onQueueIndexChanged 回调自动同步
+        mediaConnection.seekToNext()
     }
 
     fun playPrevious() {
-        val state = _uiState.value
-        val prevIndex = if (state.currentIndex == 0) state.songs.size - 1 else state.currentIndex - 1
-        playSongAt(prevIndex)
+        // 走 Player 队列（通知栏上一首按钮也是这个路径）
+        mediaConnection.seekToPrevious()
     }
 
     fun cyclePlayMode() {
@@ -359,6 +386,8 @@ class PlayerViewModel(private val application: Application) : AndroidViewModel(a
             PlayMode.REPEAT_ONE -> PlayMode.SEQUENCE
         }
         _uiState.value = state.copy(playMode = next)
+        // 同步播放模式到 Player（影响通知栏循环/随机行为）
+        mediaConnection.setPlayMode(next)
     }
 
     fun seekTo(position: Long) {
