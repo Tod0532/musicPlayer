@@ -67,14 +67,21 @@ class NewsPlayerController(context: Context) {
                 }
             }
 
-            @Deprecated("Deprecated in Java")
+            @Deprecated("Deprecated in Java", ReplaceWith(""))
             override fun onError(utteranceId: String?) {
-                onError2(utteranceId)
-            }
-
-            private fun onError2(utteranceId: String?) {
+                // 朗读出错：标记停止，自动跳到下一条
                 isPlayingFlag = false
                 onStateChanged?.invoke(false, currentIndex, queue.size)
+                val next = currentIndex + 1
+                if (next < queue.size) speakItem(next)
+            }
+
+            override fun onError(utteranceId: String?, errorCode: Int) {
+                // 新版 API 的 onError（带错误码），同样跳下一条
+                isPlayingFlag = false
+                onStateChanged?.invoke(false, currentIndex, queue.size)
+                val next = currentIndex + 1
+                if (next < queue.size) speakItem(next)
             }
         })
     }

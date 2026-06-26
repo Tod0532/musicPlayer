@@ -116,15 +116,29 @@ fun MelodyApp(viewModel: PlayerViewModel = viewModel()) {
             containerColor = MaterialTheme.colorScheme.background,
             bottomBar = {
                 Column {
-                    // 底部播放条（常驻）
-                    MiniPlayer(
-                        song = uiState.currentSong,
-                        playState = uiState.playState,
-                        progress = uiState.progress,
-                        onClick = { viewModel.toggleFullScreenPlayer() },
-                        onPlayPause = { viewModel.togglePlayPause() },
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                    )
+                    // 底部播放条（常驻，根据模式显示不同内容）
+                    if (uiState.isNewsMode) {
+                        // 新闻播报模式的播放条
+                        com.melody.app.ui.news.NewsMiniPlayer(
+                            title = uiState.newsItems.getOrNull(uiState.newsIndex)?.title ?: "正在播报",
+                            source = uiState.newsItems.getOrNull(uiState.newsIndex)?.source ?: "",
+                            index = uiState.newsIndex,
+                            total = uiState.newsItems.size,
+                            isPlaying = uiState.isNewsPlaying,
+                            onClick = { viewModel.openNewsFullScreen() },
+                            onPlayPause = { viewModel.newsPlayPause() },
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                        )
+                    } else {
+                        MiniPlayer(
+                            song = uiState.currentSong,
+                            playState = uiState.playState,
+                            progress = uiState.progress,
+                            onClick = { viewModel.toggleFullScreenPlayer() },
+                            onPlayPause = { viewModel.togglePlayPause() },
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                        )
+                    }
                     // 底部导航
                     NavigationBar(containerColor = MaterialTheme.colorScheme.background) {
                         tabs.forEachIndexed { index, tab ->

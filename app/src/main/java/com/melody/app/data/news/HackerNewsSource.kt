@@ -1,6 +1,9 @@
 package com.melody.app.data.news
 
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.net.HttpURLConnection
@@ -19,26 +22,23 @@ object HackerNewsSource {
      * 抓取 AI 相关的热门新闻
      * @param limit 最多返回条数
      */
-    suspend fun fetch(limit: Int = 15): List<NewsItem> = withContext(Dispatchers.IO) {
-        val result = mutableListOf<NewsItem>()
-        try {
-            // 1. 取 top stories（前 100 条 ID）
-            val ids = fetchJsonArray("$BASE/topstories.json")?.take(100) ?: return@withContext result
+    suspend fun fetch(limit: Int = 15): List<NewsItem> = kotlinx.coroutines.coroutineScope {
+        val ids = withContext(Dispatchers.IO) {
+            fetchJsonArray("$BASE/topstories.json")?.take(50)
+        } ?: return@coroutineScope emptyList()
 
-            // 2. 逐条取详情，过滤 AI 相关（并发优化：只取前 100 条，够筛出 AI 内容）
-            for (id in ids) {
-                if (result.size >= limit) break
-                try {
-                    val item = fetchItem(id.toLong()) ?: continue
-                    // 标题或 URL 含 AI 关键词才保留
-                    val checkText = "${item.title} ${item.url}"
-                    if (NewsItem.isAiRelated(checkText)) {
-                        result.add(item)
-                    }
-                } catch (_: Exception) { /* 跳过单条失败 */ }
+        // 并发取详情（coroutineScope 内可直接 async）
+        val deferredItems = ids.map { id ->
+            async(Dispatchers.IO) {
+                try { fetchItem(id.toLong()) } catch (_: Exception) { null }
             }
-        } catch (_: Exception) { /* 整体失败返回已收集的 */ }
-        result
+        }
+        val items = deferredItems.awaitAll().filterNotNull()
+
+        // 过滤 AI 相关，按热度排序
+        items.filter { NewsItem.isAiRelated("${it.title} ${it.url}") }
+            .sortedByDescending { it.score }
+            .take(limit)
     }
 
     private fun fetchJsonArray(urlStr: String): List<String>? {
@@ -89,12 +89,27 @@ object HackerNewsSource {
     }
 
     /**
-     * 生成摘要：标题 + （如果 URL 可达，尝试取正文前几句，否则只用标题）
-     * 简化版：只用标题作为摘要基础（避免大量额外网络请求）
+     * 生成摘要：抓取原文的 meta description 或正文首段
+     * 失败则用标题
      */
     private fun generateSummary(title: String, url: String): String {
-        // 截取式摘要：标题本身就是核心信息
-        // 完整正文抓取太慢（每条要额外请求），这里用标题
-        return title
+        if (url.isBlank()) return title
+        return try {
+            val doc = org.jsoup.Jsoup.connect(url)
+                .userAgent("Mozilla/5.0 (Linux; Android 14) Melody/1.0")
+                .timeout(4000)
+                .get()
+            // 优先 meta description
+            val metaDesc = doc.select("meta[name=description]").attr("content").trim()
+            if (metaDesc.length > 20) return metaDesc.take(300)
+            // 其次 og:description
+            val ogDesc = doc.select("meta[property=og:description]").attr("content").trim()
+            if (ogDesc.length > 20) return ogDesc.take(300)
+            // 最后正文首段
+            val firstP = doc.select("p").first()?.text()?.trim()
+            if (!firstP.isNullOrBlank() && firstP.length > 20) firstP.take(300) else title
+        } catch (_: Exception) {
+            title
+        }
     }
 }

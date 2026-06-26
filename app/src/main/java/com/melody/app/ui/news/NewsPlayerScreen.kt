@@ -125,6 +125,27 @@ fun NewsPlayerScreen(
 
             Spacer(Modifier.weight(1f))
 
+            // 朗读进度条（基于当前条数/总条数）
+            val progress = if (total > 0) (index + 1).toFloat() / total else 0f
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(0.7f)
+                    .height(3.dp)
+                    .clip(RoundedCornerShape(2.dp))
+                    .background(Color.White.copy(alpha = 0.15f))
+                    .align(Alignment.CenterHorizontally)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth(progress.coerceIn(0f, 1f))
+                        .height(3.dp)
+                        .clip(RoundedCornerShape(2.dp))
+                        .background(MaterialTheme.colorScheme.primary)
+                )
+            }
+
+            Spacer(Modifier.height(16.dp))
+
             // 控制按钮
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -161,12 +182,33 @@ fun NewsPlayerScreen(
             }
 
             Spacer(Modifier.height(16.dp))
-            Text(
-                text = if (isPlaying) "正在朗读..." else "已暂停",
-                style = MaterialTheme.typography.bodySmall,
-                color = Color.White.copy(alpha = 0.4f),
-                modifier = Modifier.align(Alignment.CenterHorizontally)
-            )
+            // 播报状态指示（朗读中显示波形动画）
+            Row(
+                modifier = Modifier.align(Alignment.CenterHorizontally),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                if (isPlaying) {
+                    // 三个跳动小点
+                    repeat(3) { i ->
+                        Box(
+                            modifier = Modifier
+                                .padding(horizontal = 3.dp)
+                                .size(6.dp)
+                                .clip(CircleShape)
+                                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.4f + i * 0.2f))
+                        )
+                    }
+                    Text(" 正在朗读...",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(start = 6.dp))
+                } else {
+                    Text("已暂停，点击中间按钮继续",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color.White.copy(alpha = 0.4f))
+                }
+            }
         }
     }
 }

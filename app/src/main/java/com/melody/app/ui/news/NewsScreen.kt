@@ -123,6 +123,35 @@ fun NewsScreen(
                     }
                 )
             }
+            // 首次进入/加载中的空状态
+            if (newsItems.isEmpty()) {
+                item {
+                    Box(
+                        modifier = Modifier.fillMaxWidth().padding(top = 80.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            if (isFetching) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(32.dp),
+                                    strokeWidth = 3.dp,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                                Text("正在抓取 AI 资讯...",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+                                    modifier = Modifier.padding(top = 12.dp))
+                            } else {
+                                Text("📰", fontSize = 40.sp)
+                                Text("点击右上角刷新，获取最新 AI 资讯",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+                                    modifier = Modifier.padding(top = 12.dp))
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 }

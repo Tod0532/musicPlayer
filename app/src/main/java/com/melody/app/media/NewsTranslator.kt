@@ -66,15 +66,18 @@ object NewsTranslator {
         }
 
         val t = translator ?: return@withContext text
-        suspendCancellableCoroutine { cont ->
-            t.translate(text)
-                .addOnSuccessListener { translated ->
-                    if (cont.isActive) cont.resume(translated)
-                }
-                .addOnFailureListener {
-                    if (cont.isActive) cont.resume(text)  // 翻译失败返回原文
-                }
-        }
+        // 5秒超时保护，避免 ML Kit 卡住阻塞整个抓取流程
+        kotlinx.coroutines.withTimeoutOrNull(5000L) {
+            suspendCancellableCoroutine { cont ->
+                t.translate(text)
+                    .addOnSuccessListener { translated ->
+                        if (cont.isActive) cont.resume(translated)
+                    }
+                    .addOnFailureListener {
+                        if (cont.isActive) cont.resume(text)  // 翻译失败返回原文
+                    }
+            }
+        } ?: text  // 超时返回原文
     }
 
     /**

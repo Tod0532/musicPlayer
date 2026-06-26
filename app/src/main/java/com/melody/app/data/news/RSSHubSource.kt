@@ -41,8 +41,8 @@ object RSSHubSource {
         val conn = (URL(urlStr).openConnection() as HttpURLConnection).apply {
             requestMethod = "GET"
             setRequestProperty("User-Agent", "Mozilla/5.0 Melody/1.0")
-            connectTimeout = 3000   // RSSHub 3秒超时，失败静默跳过
-            readTimeout = 3000
+            connectTimeout = 6000   // 6秒超时（rsshub.app 国内访问较慢）
+            readTimeout = 6000
         }
         return try {
             if (conn.responseCode != 200) return emptyList()

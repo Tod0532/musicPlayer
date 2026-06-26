@@ -259,6 +259,10 @@ class PlayerViewModel(private val application: Application) : AndroidViewModel(a
      */
     fun switchTab(index: Int) {
         _uiState.value = _uiState.value.copy(currentTab = index)
+        // 进入资讯 Tab 时自动抓取（首次或列表为空时）
+        if (index == 4 && _uiState.value.newsItems.isEmpty() && !_uiState.value.isFetchingNews) {
+            fetchNews()
+        }
     }
 
     /**
@@ -315,6 +319,10 @@ class PlayerViewModel(private val application: Application) : AndroidViewModel(a
     }
 
     fun playSongAt(index: Int) {
+        // 互斥：播放音乐时停止新闻播报
+        if (_uiState.value.isNewsMode) {
+            stopNewsPlayback()
+        }
         val state = _uiState.value
         val song = state.songs.getOrNull(index) ?: return
         // 加载对应歌词（如果有 LRC 文件）
@@ -449,8 +457,12 @@ class PlayerViewModel(private val application: Application) : AndroidViewModel(a
             )
         }
         npc.onCompleted = {
-            // 全部播完，退出新闻模式
-            _uiState.value = _uiState.value.copy(isNewsMode = false, isNewsPlaying = false)
+            // 全部播完，退出新闻模式 + 关闭全屏页
+            _uiState.value = _uiState.value.copy(
+                isNewsMode = false,
+                isNewsPlaying = false,
+                isNewsFullScreen = false
+            )
         }
     }
 
@@ -511,6 +523,10 @@ class PlayerViewModel(private val application: Application) : AndroidViewModel(a
 
     fun closeNewsFullScreen() {
         _uiState.value = _uiState.value.copy(isNewsFullScreen = false)
+    }
+
+    fun openNewsFullScreen() {
+        _uiState.value = _uiState.value.copy(isNewsFullScreen = true)
     }
 
     /**

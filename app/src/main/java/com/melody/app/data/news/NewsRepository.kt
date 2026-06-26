@@ -2,6 +2,7 @@ package com.melody.app.data.news
 
 import com.melody.app.media.NewsTranslator
 import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 
 /**
@@ -36,35 +37,36 @@ object NewsRepository {
     }
 
     /**
-     * 翻译新闻列表中的英文内容
+     * 翻译新闻列表中的英文内容（并发翻译加速）
      * 只翻译检测为英文的标题和摘要，中文内容保持原样
      */
-    private suspend fun translateItems(items: List<NewsItem>): List<NewsItem> {
+    private suspend fun translateItems(items: List<NewsItem>): List<NewsItem> = coroutineScope {
         // 确保翻译模型就绪（首次会下载，约30MB）
         val modelReady = NewsTranslator.ensureReady()
-        if (!modelReady) return items  // 模型不可用，返回原文
+        if (!modelReady) return@coroutineScope items  // 模型不可用，返回原文
 
-        return items.map { item ->
-            val titleEn = item.title
-            val summaryEn = item.summary
+        // 并发翻译每条（比串行快很多）
+        items.map { item ->
+            async { translateItem(item) }
+        }.awaitAll()
+    }
 
-            // 翻译标题（如果是英文）
-            val titleCn = if (NewsTranslator.isLikelyEnglish(titleEn)) {
-                NewsTranslator.translate(titleEn)
-            } else titleEn
+    /**
+     * 翻译单条新闻
+     */
+    private suspend fun translateItem(item: NewsItem): NewsItem {
+        val titleEn = item.title
+        val summaryEn = item.summary
 
-            // 翻译摘要（如果是英文）
-            val summaryCn = if (summaryEn != titleEn && NewsTranslator.isLikelyEnglish(summaryEn)) {
-                NewsTranslator.translate(summaryEn)
-            } else summaryEn
+        val titleCn = if (NewsTranslator.isLikelyEnglish(titleEn)) {
+            NewsTranslator.translate(titleEn)
+        } else titleEn
 
-            // 保留原文标题在摘要前（方便用户对照）
-            val finalSummary = if (titleEn != titleCn && summaryEn.isNotBlank()) {
-                "$summaryCn"
-            } else summaryCn
+        val summaryCn = if (summaryEn != titleEn && NewsTranslator.isLikelyEnglish(summaryEn)) {
+            NewsTranslator.translate(summaryEn)
+        } else summaryEn
 
-            item.copy(title = titleCn, summary = finalSummary)
-        }
+        return item.copy(title = titleCn, summary = summaryCn)
     }
 
     /**
