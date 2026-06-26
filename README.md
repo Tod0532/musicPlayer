@@ -1,11 +1,32 @@
-# Melody · 仿 QQ 音乐本地播放器
+<div align="center">
 
-一款学习现代 Android 开发架构的本地音乐播放器，UI 仿 QQ 音乐风格，支持本地音乐扫描、真实播放、歌单管理、在线搜索、歌词联动。
+# 🎵 Melody
 
-> **类型**：原生 Android APP（Kotlin + Jetpack Compose，非 WebView / 非跨平台）
-> **平台**：Android 8.0（API 26）及以上，覆盖约 98% 设备
-> **代码规模**：24 个 Kotlin 文件，约 3196 行代码
-> **APK**：23 MB（含 3 段示例音频 + LRC 歌词）
+### 仿 QQ 音乐 · 原生 Android 本地音乐播放器
+
+学习现代 Android 开发架构的本地音乐播放器，UI 仿 QQ 音乐风格，支持本地音乐扫描、真实播放、歌单管理、在线搜索、歌词联动。
+
+![Kotlin](https://img.shields.io/badge/Kotlin-2.0.21-7F52FF?logo=kotlin&logoColor=white)
+![Jetpack Compose](https://img.shields.io/badge/Jetpack%20Compose-2024.12-4285F4?logo=jetpackcompose&logoColor=white)
+![Material 3](https://img.shields.io/badge/Material%203-Design-757575?logo=materialdesign&logoColor=white)
+![Media3](https://img.shields.io/badge/Media3-1.4.1-34A853?logo=android&logoColor=white)
+![Room](https://img.shields.io/badge/Room-2.6.1-FF6F00?logo=android&logoColor=white)
+![Android](https://img.shields.io/badge/Android-API%2026+-3DDC84?logo=android&logoColor=white)
+![License](https://img.shields.io/badge/License-MIT-yellow)
+
+![minSdk](https://img.shields.io/badge/minSdk-26-red)
+![targetSdk](https://img.shields.io/badge/targetSdk-34-green)
+![APK Size](https://img.shields.io/badge/APK%20Size-23MB-blue)
+
+**原生 Kotlin + Jetpack Compose · 非 WebView · 非跨平台**
+
+</div>
+
+---
+
+> 📱 **Android 8.0+** · 🎵 **Media3 流式播放** · 📂 **Room 歌单管理** · 🎤 **LRC 歌词联动** · 🔔 **后台播放 + 通知栏**
+>
+> 📊 24 个 Kotlin 文件 · ~3196 行代码 · 7 个 Git 提交 · 9/9 MVP 功能完成
 
 ---
 
