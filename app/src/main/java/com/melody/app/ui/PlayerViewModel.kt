@@ -464,6 +464,14 @@ class PlayerViewModel(private val application: Application) : AndroidViewModel(a
                 isNewsFullScreen = false
             )
         }
+        npc.onTtsNotAvailable = {
+            // TTS 引擎不可用，退出新闻模式
+            _uiState.value = _uiState.value.copy(
+                isNewsMode = false,
+                isNewsPlaying = false,
+                isNewsFullScreen = false
+            )
+        }
     }
 
     /**

@@ -16,6 +16,11 @@ android {
         targetSdk = 34
         versionCode = 1
         versionName = "1.0"
+        // 只打包真机用得到的 ABI，排除 x86/x86_64（模拟器架构）
+        // ML Kit libtranslate_jni.so 占 62MB，过滤后只保留 arm64(16MB)+armeabi(11MB)
+        ndk {
+            abiFilters += listOf("arm64-v8a", "armeabi-v7a")
+        }
     }
 
     buildTypes {
