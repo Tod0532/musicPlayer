@@ -87,6 +87,13 @@ fun MelodyApp(viewModel: PlayerViewModel = viewModel()) {
         }
     }
 
+    // 启动时：已有权限则自动扫描一次
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        if (viewModel.checkPermission()) {
+            viewModel.scanLocalMusic()
+        }
+    }
+
     // 请求权限的触发函数（由 UI 按钮调用，避免启动时自动弹窗的时序问题）
     fun requestScan() {
         if (viewModel.checkPermission()) {

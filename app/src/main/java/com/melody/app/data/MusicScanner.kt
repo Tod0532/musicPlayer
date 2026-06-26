@@ -76,11 +76,9 @@ object MusicScanner {
                 val contentUri = ContentUris.withAppendedId(
                     collection, id
                 )
-                // 专辑封面 URI（用 ALBUM_ID 拼接 Artwork 的 contentUri）
-                val albumId = if (albumIdColumn >= 0) it.getLong(albumIdColumn) else -1L
-                val coverUri = if (albumId > 0) {
-                    "content://media/external/audio/albumart/$albumId"
-                } else null
+                // 封面：用自定义 scheme 标记音频文件 URI，让 AudioCoverFetcher 提取内嵌封面
+                // （不用 albumart URI，系统经常没索引到会报错）
+                val coverUri = "audio-cover://${contentUri}"
 
                 // 跳过过短的音频（< 10 秒，可能是铃声片段）
                 if (duration < 10000) continue

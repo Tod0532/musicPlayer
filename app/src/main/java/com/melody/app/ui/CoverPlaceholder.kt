@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material3.Icon
@@ -73,19 +74,34 @@ fun CoverPlaceholder(
                     )
                 )
         )
-        // 真实封面（有 coverUri 时用 Coil 加载，覆盖渐变占位层）
+        // 真实封面：异步提取内嵌封面（不依赖 Coil Factory 匹配）
         if (coverUri != null) {
-            coil.compose.AsyncImage(
-                model = coil.request.ImageRequest.Builder(androidx.compose.ui.platform.LocalContext.current)
-                    .data(coverUri)
-                    .crossfade(true)
-                    .build(),
-                contentDescription = null,
-                contentScale = androidx.compose.ui.layout.ContentScale.Crop,
-                modifier = Modifier.fillMaxSize()
-            )
+            val context = androidx.compose.ui.platform.LocalContext.current
+            val coverState = androidx.compose.runtime.produceState<android.graphics.Bitmap?>(
+                initialValue = null,
+                coverUri
+            ) {
+                value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                    com.melody.app.media.extractEmbeddedCover(context, coverUri)
+                }
+            }
+            val bmp = coverState.value
+            if (bmp != null) {
+                androidx.compose.foundation.Image(
+                    bitmap = bmp.asImageBitmap(),
+                    contentDescription = null,
+                    contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize()
+                )
+            } else {
+                Icon(
+                    imageVector = Icons.Filled.MusicNote,
+                    contentDescription = null,
+                    tint = Color.White.copy(alpha = 0.9f),
+                    modifier = Modifier.size(iconSize)
+                )
+            }
         } else {
-            // 无封面时显示音符图标
             Icon(
                 imageVector = Icons.Filled.MusicNote,
                 contentDescription = null,
