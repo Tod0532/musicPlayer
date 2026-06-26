@@ -53,7 +53,6 @@ object MusicScanner {
                 sortOrder
             )
         } catch (e: Exception) {
-            System.err.println("MELODY_SCAN: 扫描失败 - ${e.message}")
             return emptyList()
         }
 
@@ -79,6 +78,11 @@ object MusicScanner {
                 // 封面：用自定义 scheme 标记音频文件 URI，让 AudioCoverFetcher 提取内嵌封面
                 // （不用 albumart URI，系统经常没索引到会报错）
                 val coverUri = "audio-cover://${contentUri}"
+                // 系统标准 albumart URI（给系统锁屏/通知栏，系统原生支持加载）
+                val albumId = if (albumIdColumn >= 0) it.getLong(albumIdColumn) else -1L
+                val albumArtUri = if (albumId > 0) {
+                    "content://media/external/audio/albumart/$albumId"
+                } else null
 
                 // 跳过过短的音频（< 10 秒，可能是铃声片段）
                 if (duration < 10000) continue
@@ -94,7 +98,8 @@ object MusicScanner {
                         coverColor = colors.first,
                         coverColor2 = colors.second,
                         mediaUri = contentUri.toString(),  // 真实歌曲的 content:// URI
-                        coverUri = coverUri                // 专辑封面 URI
+                        coverUri = coverUri,                // 内嵌封面（APP 内）
+                        albumArtUri = albumArtUri           // 系统锁屏用
                     )
                 )
                 index++
@@ -103,7 +108,6 @@ object MusicScanner {
             }
         }
 
-        System.err.println("MELODY_SCAN: 扫描到 ${result.size} 首本地音乐")
         return result
     }
 

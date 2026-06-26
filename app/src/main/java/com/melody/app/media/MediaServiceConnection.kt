@@ -172,24 +172,40 @@ class MediaServiceConnection(private val context: Context) {
 }
 
 /**
- * 队列项（用于设置播放队列 + 通知栏元数据显示）
+ * 队列项（用于设置播放队列 + 通知栏/锁屏元数据显示）
  */
 data class QueueItem(
     val uri: String,
     val title: String,
     val artist: String,
-    val album: String = ""
+    val album: String = "",
+    val coverUri: String? = null,    // 封面 URI（系统锁屏会显示大封面）
+    val durationMs: Long = 0L        // 时长（让锁屏显示总时长）
 ) {
     fun toMediaItem(): MediaItem {
+        val metadataBuilder = MediaMetadata.Builder()
+            .setTitle(title)
+            .setArtist(artist)
+            .setAlbumTitle(album)
+        // 封面：用系统标准 albumart URI（系统锁屏/通知栏原生支持加载）
+        // 系统会按需触发封面提取，即使 albumart 表暂时为空
+        val systemCover = coverUri?.let { c ->
+            when {
+                c.startsWith("audio-cover://") -> null  // 自定义 scheme 系统不认识，跳过
+                c.startsWith("content://media/external/audio/albumart") -> c
+                c.startsWith("content://") -> c
+                else -> null
+            }
+        }
+        if (systemCover != null) {
+            metadataBuilder.setArtworkUri(android.net.Uri.parse(systemCover))
+        }
+        if (durationMs > 0) {
+            metadataBuilder.setDurationMs(durationMs)
+        }
         return MediaItem.Builder()
             .setUri(uri)
-            .setMediaMetadata(
-                MediaMetadata.Builder()
-                    .setTitle(title)
-                    .setArtist(artist)
-                    .setAlbumTitle(album)
-                    .build()
-            )
+            .setMediaMetadata(metadataBuilder.build())
             .build()
     }
 }

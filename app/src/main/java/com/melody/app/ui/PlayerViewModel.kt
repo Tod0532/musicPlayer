@@ -238,10 +238,6 @@ class PlayerViewModel(private val application: Application) : AndroidViewModel(a
             val scanned = withContext(Dispatchers.IO) {
                 MusicScanner.scan(application)
             }
-            // 诊断：确认 coverUri 是否生成
-            scanned.forEach { s ->
-                System.err.println("MELODY_COVER: 歌曲 ${s.title} coverUri=${s.coverUri}")
-            }
             // 合并：扫描到的真实歌曲 + 内置示例（示例作为兜底/演示）
             val merged = if (scanned.isNotEmpty()) scanned else SampleData.songs
             _uiState.value = _uiState.value.copy(
@@ -340,7 +336,9 @@ class PlayerViewModel(private val application: Application) : AndroidViewModel(a
                 uri = uri,
                 title = s.title,
                 artist = s.artist,
-                album = s.album
+                album = s.album,
+                coverUri = s.albumArtUri ?: s.coverUri,
+                durationMs = s.duration
             )
         }
         // 队列中对应的索引（跳过无音频项后重新计数）

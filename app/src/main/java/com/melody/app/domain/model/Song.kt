@@ -15,7 +15,8 @@ data class Song(
     val audioAsset: String? = null,   // assets 内音频文件名（内置示例曲）
     val mediaUri: String? = null,     // MediaStore content:// URI（扫描到的真实歌曲）
     val lrcAsset: String? = null,     // assets 内 LRC 歌词文件名
-    val coverUri: String? = null      // 专辑封面 content:// URI（无则用渐变占位）
+    val coverUri: String? = null,     // 内嵌封面提取用（APP 内显示）
+    val albumArtUri: String? = null   // 系统标准 albumart URI（给系统锁屏/通知栏用）
 )
 
 /**

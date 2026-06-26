@@ -85,9 +85,7 @@ object OnlineMusicSource {
         // 但可用于"搜索建议"或歌词关联（后续功能）
         if (query.isNotBlank()) {
             try {
-                val mbCount = queryMusicBrainzCount(query)
-                // 元数据命中数记入日志（供调试），不影响可播放结果
-                System.err.println("MELODY_SEARCH: MusicBrainz 元数据命中 $mbCount 条（仅元数据，不含音频）")
+                queryMusicBrainzCount(query)
             } catch (_: Exception) { }
         }
 
