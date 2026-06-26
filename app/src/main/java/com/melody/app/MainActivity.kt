@@ -24,6 +24,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.LibraryMusic
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Article
+import androidx.compose.material.icons.outlined.Article
 import androidx.compose.material.icons.outlined.Explore
 import androidx.compose.material.icons.outlined.LibraryMusic
 import androidx.compose.material.icons.outlined.Search
@@ -70,7 +72,8 @@ private val tabs = listOf(
     TabItem("我的", Icons.Filled.LibraryMusic, Icons.Outlined.LibraryMusic),
     TabItem("搜索", Icons.Filled.Search, Icons.Outlined.Search),
     TabItem("歌单", Icons.Filled.Explore, Icons.Outlined.Explore),
-    TabItem("发现", Icons.Filled.Explore, Icons.Outlined.Explore)
+    TabItem("发现", Icons.Filled.Explore, Icons.Outlined.Explore),
+    TabItem("资讯", Icons.Filled.Article, Icons.Outlined.Article)
 )
 
 @Composable
@@ -172,6 +175,13 @@ fun MelodyApp(viewModel: PlayerViewModel = viewModel()) {
                             onAddCurrentSong = { playlist -> viewModel.addCurrentSongToPlaylist(playlist.id) }
                         )
                     }
+                    4 -> com.melody.app.ui.news.NewsScreen(
+                        newsItems = uiState.newsItems,
+                        isFetching = uiState.isFetchingNews,
+                        onRefresh = { viewModel.fetchNews() },
+                        onStartPlaybackAll = { viewModel.startNewsPlaybackAll() },
+                        onPlaySingle = { index -> viewModel.playNewsSingle(index) }
+                    )
                     else -> MyMusicScreen(
                         songs = uiState.songs,
                         currentIndex = uiState.currentIndex,
@@ -205,6 +215,25 @@ fun MelodyApp(viewModel: PlayerViewModel = viewModel()) {
                 onSeek = { pos -> viewModel.seekTo(pos) },
                 onToggleFavorite = { viewModel.toggleFavorite() },
                 onLyricClick = { time -> viewModel.seekTo(time) }
+            )
+        }
+
+        // 新闻播报详情页（浮层，带动画）
+        AnimatedVisibility(
+            visible = uiState.isNewsFullScreen,
+            enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
+            exit = slideOutVertically(targetOffsetY = { it }) + fadeOut(),
+            modifier = Modifier.fillMaxSize()
+        ) {
+            com.melody.app.ui.news.NewsPlayerScreen(
+                currentItem = uiState.newsItems.getOrNull(uiState.newsIndex),
+                index = uiState.newsIndex,
+                total = uiState.newsItems.size,
+                isPlaying = uiState.isNewsPlaying,
+                onClose = { viewModel.closeNewsFullScreen() },
+                onPlayPause = { viewModel.newsPlayPause() },
+                onNext = { viewModel.newsNext() },
+                onPrevious = { viewModel.newsPrevious() }
             )
         }
     }

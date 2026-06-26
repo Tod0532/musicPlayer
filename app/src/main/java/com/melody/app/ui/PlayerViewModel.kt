@@ -43,7 +43,14 @@ data class PlayerUiState(
     val currentTab: Int = 0,            // 当前 Tab（0=我的, 1=搜索, 2=歌单）
     val playlists: List<PlaylistEntity> = emptyList(),  // 歌单列表
     val playlistSongs: List<PlaylistSongEntity> = emptyList(),  // 当前歌单内的歌曲
-    val viewingPlaylistId: Long? = null  // 正在查看的歌单 ID（null=歌单列表页）
+    val viewingPlaylistId: Long? = null,  // 正在查看的歌单 ID（null=歌单列表页）
+    // ---- 资讯播报 ----
+    val newsItems: List<com.melody.app.data.news.NewsItem> = emptyList(),  // 新闻列表
+    val isFetchingNews: Boolean = false,    // 是否正在抓取新闻
+    val isNewsMode: Boolean = false,         // 是否处于新闻播报模式
+    val newsIndex: Int = 0,                  // 当前播报的新闻索引
+    val isNewsPlaying: Boolean = false,      // 新闻是否正在朗读
+    val isNewsFullScreen: Boolean = false    // 是否展开播报详情页
 ) {
     val currentSong: Song get() = songs.getOrElse(currentIndex) { songs.firstOrNull() ?: Song(0, "", "", "", 0L) }
     val progress: Float
@@ -432,9 +439,96 @@ class PlayerViewModel(private val application: Application) : AndroidViewModel(a
         }
     }
 
+    // ============ 资讯播报 ============
+
+    private val newsPlayer = com.melody.app.media.NewsPlayerController(application).also { npc ->
+        npc.onStateChanged = { isPlaying, index, total ->
+            _uiState.value = _uiState.value.copy(
+                isNewsPlaying = isPlaying,
+                newsIndex = index
+            )
+        }
+        npc.onCompleted = {
+            // 全部播完，退出新闻模式
+            _uiState.value = _uiState.value.copy(isNewsMode = false, isNewsPlaying = false)
+        }
+    }
+
+    /**
+     * 抓取 AI 资讯（并发三源）
+     */
+    fun fetchNews() {
+        if (_uiState.value.isFetchingNews) return
+        _uiState.value = _uiState.value.copy(isFetchingNews = true)
+        viewModelScope.launch {
+            val news = withContext(Dispatchers.IO) {
+                com.melody.app.data.news.NewsRepository.fetchAllNews()
+            }
+            _uiState.value = _uiState.value.copy(
+                newsItems = news,
+                isFetchingNews = false
+            )
+        }
+    }
+
+    /**
+     * 开始播报全部新闻（从第一条开始）
+     */
+    fun startNewsPlaybackAll() {
+        val items = _uiState.value.newsItems
+        if (items.isEmpty()) return
+        // 互斥：暂停音乐
+        mediaConnection.pause()
+        _uiState.value = _uiState.value.copy(
+            isNewsMode = true,
+            isNewsFullScreen = true,
+            newsIndex = 0
+        )
+        newsPlayer.startPlayback(items, 0)
+    }
+
+    /**
+     * 播报单条新闻
+     */
+    fun playNewsSingle(index: Int) {
+        val items = _uiState.value.newsItems
+        if (items.isEmpty() || index !in items.indices) return
+        mediaConnection.pause()
+        _uiState.value = _uiState.value.copy(
+            isNewsMode = true,
+            isNewsFullScreen = true,
+            newsIndex = index
+        )
+        newsPlayer.startPlayback(items, index)
+    }
+
+    fun newsPlayPause() {
+        if (_uiState.value.isNewsPlaying) newsPlayer.pause() else newsPlayer.play()
+    }
+
+    fun newsNext() { newsPlayer.next() }
+    fun newsPrevious() { newsPlayer.previous() }
+
+    fun closeNewsFullScreen() {
+        _uiState.value = _uiState.value.copy(isNewsFullScreen = false)
+    }
+
+    /**
+     * 停止新闻播报，切回音乐模式
+     */
+    fun stopNewsPlayback() {
+        newsPlayer.stop()
+        _uiState.value = _uiState.value.copy(
+            isNewsMode = false,
+            isNewsPlaying = false,
+            isNewsFullScreen = false
+        )
+    }
+
     override fun onCleared() {
         super.onCleared()
         progressJob?.cancel()
         mediaConnection.disconnect()
+        newsPlayer.release()
     }
 }
