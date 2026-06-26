@@ -35,4 +35,19 @@ data class PlaylistSongEntity(
     val coverColor2: Long,
     val audioAsset: String? = null,
     val mediaUri: String? = null
-)
+) {
+    /**
+     * 转换为可播放的 Song
+     */
+    fun toSong(): com.melody.app.domain.model.Song = com.melody.app.domain.model.Song(
+        id = songId,
+        title = title,
+        artist = artist,
+        album = album,
+        duration = duration,
+        coverColor = coverColor,
+        coverColor2 = coverColor2,
+        audioAsset = audioAsset,
+        mediaUri = mediaUri
+    )
+}

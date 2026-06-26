@@ -13,6 +13,10 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -20,6 +24,7 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.windowInsetsPadding
@@ -39,6 +44,17 @@ fun MyMusicScreen(
     isScanning: Boolean = false,
     onScanClick: () -> Unit = {}
 ) {
+    // 本地搜索过滤（纯 UI 状态）
+    var localQuery by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf("") }
+    val filteredSongs = androidx.compose.runtime.remember(songs, localQuery) {
+        if (localQuery.isBlank()) songs
+        else songs.filter {
+            it.title.contains(localQuery, true) ||
+            it.artist.contains(localQuery, true) ||
+            it.album.contains(localQuery, true)
+        }
+    }
+
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -85,12 +101,61 @@ fun MyMusicScreen(
         Text(
             text = when {
                 isScanning -> "正在扫描本地音乐..."
+                localQuery.isNotBlank() -> "筛选结果 ${filteredSongs.size} 首"
                 songs.isNotEmpty() -> "共 ${songs.size} 首歌曲"
                 else -> "暂无音乐"
             },
             style = MaterialTheme.typography.bodySmall,
-            modifier = Modifier.padding(start = 20.dp, bottom = 12.dp)
+            modifier = Modifier.padding(start = 20.dp, bottom = 8.dp)
         )
+
+        // 本地搜索框
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp, vertical = 4.dp)
+                .clip(RoundedCornerShape(20.dp))
+                .background(MaterialTheme.colorScheme.surface)
+                .padding(horizontal = 14.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "🔍",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            androidx.compose.foundation.text.BasicTextField(
+                value = localQuery,
+                onValueChange = { localQuery = it },
+                modifier = Modifier.weight(1f),
+                textStyle = androidx.compose.ui.text.TextStyle(
+                    color = MaterialTheme.colorScheme.onSurface,
+                    fontSize = 14.sp
+                ),
+                cursorBrush = androidx.compose.ui.graphics.SolidColor(MaterialTheme.colorScheme.primary),
+                singleLine = true,
+                decorationBox = { inner ->
+                    if (localQuery.isEmpty()) {
+                        Text(
+                            text = "筛选本地歌曲",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
+                        )
+                    }
+                    inner()
+                }
+            )
+            if (localQuery.isNotEmpty()) {
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "✕",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+                    modifier = Modifier.clickable { localQuery = "" }
+                )
+            }
+        }
 
         // Tab（静态展示）
         Row(
@@ -107,18 +172,37 @@ fun MyMusicScreen(
 
         HorizontalDivider()
 
-        // 歌曲列表
+        // 歌曲列表（用过滤后的）
         LazyColumn(
             modifier = Modifier.weight(1f),
             contentPadding = PaddingValues(vertical = 6.dp)
         ) {
-            items(songs.size) { index ->
-                val song = songs[index]
+            items(filteredSongs.size) { index ->
+                val song = filteredSongs[index]
+                // 找到原始 songs 中的索引（保证点击播放正确的歌）
+                val originalIndex = songs.indexOf(song)
                 SongRow(
                     song = song,
-                    isPlaying = index == currentIndex,
-                    onClick = { onSongClick(index) }
+                    isPlaying = originalIndex == currentIndex,
+                    onClick = { onSongClick(originalIndex) }
                 )
+            }
+            // 空结果提示
+            if (filteredSongs.isEmpty() && localQuery.isNotBlank()) {
+                item {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 40.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "未找到匹配的歌曲",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
+                        )
+                    }
+                }
             }
         }
     }

@@ -56,6 +56,7 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -66,6 +67,7 @@ import com.melody.app.domain.model.PlayState
 import com.melody.app.domain.model.Song
 import com.melody.app.ui.CoverPlaceholder
 import com.melody.app.ui.formatDuration
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 
@@ -347,53 +349,95 @@ private fun SongInfoRow(song: Song, isFavorite: Boolean, onToggleFavorite: () ->
 @Composable
 private fun ProgressBar(position: Long, duration: Long, onSeek: (Long) -> Unit) {
     val rawProgress = if (duration > 0) (position.toFloat() / duration) else 0f
-    val progress = if (rawProgress.isFinite()) rawProgress.coerceIn(0f, 1f) else 0f
+    val playerProgress = if (rawProgress.isFinite()) rawProgress.coerceIn(0f, 1f) else 0f
+
+    // 拖动状态：非 null 表示正在拖动，值是拖动中的进度
+    var dragProgress by remember { mutableStateOf<Float?>(null) }
+    val displayProgress = dragProgress ?: playerProgress
+    val displayPosition = (duration * displayProgress).toLong()
 
     Column(modifier = Modifier.fillMaxWidth()) {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(20.dp)
+                .height(28.dp)
                 .pointerInput(duration) {
+                    val trackWidthPx = size.width.toFloat()
+                    // 点击 seek
                     detectTapGestures(
                         onTap = { offset ->
-                            val trackWidthPx = size.width.toFloat()
                             if (trackWidthPx > 0 && duration > 0) {
                                 val ratio = (offset.x / trackWidthPx).coerceIn(0f, 1f)
+                                dragProgress = null
                                 onSeek((duration * ratio).toLong())
                             }
                         }
+                    )
+                }
+                .pointerInput(duration) {
+                    val trackWidthPx = size.width.toFloat()
+                    // 拖拽 seek
+                    detectHorizontalDragGestures(
+                        onDragStart = { offset ->
+                            if (trackWidthPx > 0 && duration > 0) {
+                                dragProgress = (offset.x / trackWidthPx).coerceIn(0f, 1f)
+                            }
+                        },
+                        onHorizontalDrag = { change, _ ->
+                            if (trackWidthPx > 0 && duration > 0) {
+                                dragProgress = (change.position.x / trackWidthPx).coerceIn(0f, 1f)
+                            }
+                            change.consume()
+                        },
+                        onDragEnd = {
+                            dragProgress?.let { onSeek((duration * it).toLong()) }
+                            dragProgress = null
+                        },
+                        onDragCancel = { dragProgress = null }
                     )
                 },
             contentAlignment = Alignment.CenterStart
         ) {
             // 轨道背景
             Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(3.dp)
+                modifier = Modifier.fillMaxWidth().height(3.dp)
                     .clip(RoundedCornerShape(2.dp))
                     .background(Color.White.copy(alpha = 0.15f))
             )
-            // 已播放部分（用 fillMaxWidth(fraction)，fraction 已 coerce 防护）
+            // 已播放部分（拖动时也跟随手指）
             Box(
-                modifier = Modifier
-                    .fillMaxWidth(progress)
-                    .height(3.dp)
+                modifier = Modifier.fillMaxWidth(displayProgress).height(3.dp)
                     .clip(RoundedCornerShape(2.dp))
                     .background(MaterialTheme.colorScheme.primary)
             )
+            // 拖动点（拖动时放大）
+            Box(
+                modifier = Modifier
+                    .padding(start = (displayProgress * 0).dp)
+                    .size(if (dragProgress != null) 14.dp else 10.dp)
+                    .align(Alignment.CenterStart)
+                    .layout { measurable, constraints ->
+                        val placeable = measurable.measure(constraints)
+                        layout(0, placeable.height) {
+                            val parentWidth = constraints.maxWidth.toFloat()
+                            val x = parentWidth * displayProgress - placeable.width / 2f
+                            placeable.placeRelative(x.coerceAtLeast(0f).toInt(), 0)
+                        }
+                    }
+                    .clip(CircleShape)
+                    .background(Color.White)
+            )
         }
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 2.dp),
+            modifier = Modifier.fillMaxWidth().padding(top = 2.dp),
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Text(
-                text = formatDuration(position),
+                text = formatDuration(displayPosition),
                 style = MaterialTheme.typography.bodySmall,
-                fontSize = 10.sp
+                fontSize = 10.sp,
+                color = if (dragProgress != null) MaterialTheme.colorScheme.primary
+                        else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
             )
             Text(
                 text = formatDuration(duration),

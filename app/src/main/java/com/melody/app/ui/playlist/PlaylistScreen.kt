@@ -7,7 +7,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
@@ -26,19 +26,29 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.melody.app.data.local.PlaylistEntity
+import com.melody.app.data.local.PlaylistSongEntity
+import com.melody.app.domain.model.Song
+import com.melody.app.ui.CoverPlaceholder
+import com.melody.app.ui.formatDuration
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
 /**
- * 歌单页
+ * 歌单页（双模式：列表 / 详情）
  */
 @Composable
 fun PlaylistScreen(
     playlists: List<PlaylistEntity>,
+    viewingPlaylist: PlaylistEntity?,
+    playlistSongs: List<PlaylistSongEntity>,
     onCreatePlaylist: (String) -> Unit,
     onDeletePlaylist: (PlaylistEntity) -> Unit,
     onPlaylistClick: (PlaylistEntity) -> Unit,
+    onBackToList: () -> Unit,
+    onPlaySong: (Int) -> Unit,
+    onRemoveSong: (PlaylistEntity, Long) -> Unit,
+    onAddCurrentSong: (PlaylistEntity) -> Unit,
     modifier: Modifier = Modifier
 ) {
     var showCreateDialog by remember { mutableStateOf(false) }
@@ -49,78 +59,26 @@ fun PlaylistScreen(
             .background(MaterialTheme.colorScheme.background)
             .windowInsetsPadding(WindowInsets.statusBars)
     ) {
-        // 标题 + 新建按钮
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(20.dp, 16.dp, 20.dp, 12.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = "歌单",
-                style = MaterialTheme.typography.headlineLarge
+        if (viewingPlaylist == null) {
+            PlaylistListMode(
+                playlists = playlists,
+                onCreate = { showCreateDialog = true },
+                onPlaylistClick = onPlaylistClick,
+                onDeletePlaylist = onDeletePlaylist,
+                onAddCurrentSong = onAddCurrentSong
             )
-            // 新建歌单按钮
-            Row(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(16.dp))
-                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f))
-                    .clickable { showCreateDialog = true }
-                    .padding(horizontal = 12.dp, vertical = 6.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(
-                    imageVector = Icons.Filled.Add,
-                    contentDescription = "新建",
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(16.dp)
-                )
-                Spacer(modifier = Modifier.width(6.dp))
-                Text(
-                    text = "新建歌单",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.primary,
-                    fontWeight = FontWeight.SemiBold
-                )
-            }
-        }
-        Text(
-            text = "共 ${playlists.size} 个歌单",
-            style = MaterialTheme.typography.bodySmall,
-            modifier = Modifier.padding(start = 20.dp, bottom = 12.dp)
-        )
-
-        // 歌单列表
-        LazyColumn(modifier = Modifier.weight(1f)) {
-            items(playlists) { playlist ->
-                PlaylistRow(
-                    playlist = playlist,
-                    onClick = { onPlaylistClick(playlist) },
-                    onDelete = { onDeletePlaylist(playlist) }
-                )
-            }
-        }
-
-        // 空状态提示
-        if (playlists.isEmpty()) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 60.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = "还没有歌单，点击右上角创建",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
-                )
-            }
+        } else {
+            PlaylistDetailMode(
+                playlist = viewingPlaylist,
+                songs = playlistSongs,
+                onBack = onBackToList,
+                onPlaySong = onPlaySong,
+                onRemoveSong = { songId -> onRemoveSong(viewingPlaylist, songId) }
+            )
         }
     }
 
-    // 新建歌单对话框
-    if (showCreateDialog) {
+    if (showCreateDialog && viewingPlaylist == null) {
         var playlistName by remember { mutableStateOf("") }
         AlertDialog(
             onDismissRequest = { showCreateDialog = false },
@@ -134,17 +92,84 @@ fun PlaylistScreen(
                 )
             },
             confirmButton = {
-                TextButton(
-                    onClick = {
-                        if (playlistName.isNotBlank()) {
-                            onCreatePlaylist(playlistName)
-                        }
-                        showCreateDialog = false
-                    }
-                ) { Text("创建") }
+                TextButton(onClick = {
+                    if (playlistName.isNotBlank()) onCreatePlaylist(playlistName)
+                    showCreateDialog = false
+                }) { Text("创建") }
             },
             dismissButton = {
                 TextButton(onClick = { showCreateDialog = false }) { Text("取消") }
+            }
+        )
+    }
+}
+
+// ---- 歌单列表模式 ----
+@Composable
+private fun ColumnScope.PlaylistListMode(
+    playlists: List<PlaylistEntity>,
+    onCreate: () -> Unit,
+    onPlaylistClick: (PlaylistEntity) -> Unit,
+    onDeletePlaylist: (PlaylistEntity) -> Unit,
+    onAddCurrentSong: (PlaylistEntity) -> Unit
+) {
+    var addTarget by remember { mutableStateOf<PlaylistEntity?>(null) }
+
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(20.dp, 16.dp, 20.dp, 12.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text("歌单", style = MaterialTheme.typography.headlineLarge)
+        Row(
+            modifier = Modifier
+                .clip(RoundedCornerShape(16.dp))
+                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f))
+                .clickable(onClick = onCreate)
+                .padding(horizontal = 12.dp, vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text("+ 新建", color = MaterialTheme.colorScheme.primary,
+                style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
+        }
+    }
+    Text("共 ${playlists.size} 个歌单",
+        style = MaterialTheme.typography.bodySmall,
+        modifier = Modifier.padding(start = 20.dp, bottom = 12.dp))
+
+    LazyColumn(modifier = Modifier.weight(1f)) {
+        items(playlists) { playlist ->
+            PlaylistRow(
+                playlist = playlist,
+                onClick = { onPlaylistClick(playlist) },
+                onDelete = { onDeletePlaylist(playlist) },
+                onAddCurrent = { addTarget = playlist }
+            )
+        }
+    }
+
+    if (playlists.isEmpty()) {
+        Box(Modifier.fillMaxWidth().padding(top = 60.dp), contentAlignment = Alignment.Center) {
+            Text("还没有歌单，点击右上角创建",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f))
+        }
+    }
+
+    // "加入当前歌曲"对话框（简化：直接加入）
+    addTarget?.let { playlist ->
+        AlertDialog(
+            onDismissRequest = { addTarget = null },
+            title = { Text(playlist.name) },
+            text = { Text("将当前播放的歌曲「加入」这个歌单？") },
+            confirmButton = {
+                TextButton(onClick = {
+                    onAddCurrentSong(playlist)
+                    addTarget = null
+                }) { Text("加入") }
+            },
+            dismissButton = {
+                TextButton(onClick = { addTarget = null }) { Text("取消") }
             }
         )
     }
@@ -154,51 +179,91 @@ fun PlaylistScreen(
 private fun PlaylistRow(
     playlist: PlaylistEntity,
     onClick: () -> Unit,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
+    onAddCurrent: () -> Unit
 ) {
     val dateFormat = remember { SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()) }
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick)
             .padding(horizontal = 20.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // 歌单封面占位（渐变方块）
         Box(
-            modifier = Modifier
-                .size(48.dp)
+            modifier = Modifier.size(48.dp)
                 .clip(RoundedCornerShape(10.dp))
                 .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)),
             contentAlignment = Alignment.Center
-        ) {
-            Text(
-                text = "♪",
-                color = MaterialTheme.colorScheme.primary,
-                fontWeight = FontWeight.Bold
-            )
+        ) { Text("♪", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold) }
+        Spacer(Modifier.width(12.dp))
+        Column(Modifier.weight(1f)) {
+            Text(playlist.name, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
+            Text("创建于 ${dateFormat.format(Date(playlist.createdAt))}",
+                style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 2.dp))
         }
-        Spacer(modifier = Modifier.width(12.dp))
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = playlist.name,
-                style = MaterialTheme.typography.bodyLarge,
-                fontWeight = FontWeight.Medium,
-                color = MaterialTheme.colorScheme.onBackground
-            )
-            Text(
-                text = "创建于 ${dateFormat.format(Date(playlist.createdAt))}",
-                style = MaterialTheme.typography.bodySmall,
-                modifier = Modifier.padding(top = 2.dp)
-            )
-        }
-        Icon(
-            imageVector = Icons.Filled.Delete,
-            contentDescription = "删除",
+        Text("+",
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.clickable(onClick = onAddCurrent).padding(8.dp))
+        Icon(Icons.Filled.Delete, "删除",
             tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
-            modifier = Modifier
-                .size(20.dp)
-                .clickable(onClick = onDelete)
-        )
+            modifier = Modifier.size(20.dp).clickable(onClick = onDelete))
+    }
+}
+
+// ---- 歌单详情模式 ----
+@Composable
+private fun ColumnScope.PlaylistDetailMode(
+    playlist: PlaylistEntity,
+    songs: List<PlaylistSongEntity>,
+    onBack: () -> Unit,
+    onPlaySong: (Int) -> Unit,
+    onRemoveSong: (Long) -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(8.dp, 8.dp, 20.dp, 12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text("‹ 返回", color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.clickable(onClick = onBack).padding(8.dp))
+        Spacer(Modifier.weight(1f))
+        Text(playlist.name, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+    }
+    Text("共 ${songs.size} 首",
+        style = MaterialTheme.typography.bodySmall,
+        modifier = Modifier.padding(start = 20.dp, bottom = 8.dp))
+
+    LazyColumn(modifier = Modifier.weight(1f)) {
+        items(songs.size) { index ->
+            val ps = songs[index]
+            Row(
+                modifier = Modifier.fillMaxWidth()
+                    .clickable { onPlaySong(index) }
+                    .padding(horizontal = 20.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                CoverPlaceholder(
+                    startColor = androidx.compose.ui.graphics.Color(ps.coverColor),
+                    endColor = androidx.compose.ui.graphics.Color(ps.coverColor2),
+                    cornerRadius = 8.dp, iconSize = 16.dp,
+                    modifier = Modifier.size(40.dp)
+                )
+                Spacer(Modifier.width(12.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(ps.title, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium, maxLines = 1)
+                    Text("${ps.artist} · ${formatDuration(ps.duration)}",
+                        style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 2.dp))
+                }
+                Icon(Icons.Filled.Delete, "移除",
+                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
+                    modifier = Modifier.size(18.dp).clickable { onRemoveSong(ps.songId) })
+            }
+        }
+    }
+
+    if (songs.isEmpty()) {
+        Box(Modifier.fillMaxWidth().padding(top = 60.dp), contentAlignment = Alignment.Center) {
+            Text("歌单是空的，在歌曲列表点 + 添加",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f))
+        }
     }
 }

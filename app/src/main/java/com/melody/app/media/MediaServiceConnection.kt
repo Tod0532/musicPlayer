@@ -24,6 +24,10 @@ class MediaServiceConnection(private val context: Context) {
     var onConnected: (() -> Unit)? = null
     var onPlaybackStateChanged: ((isPlaying: Boolean, position: Long, duration: Long) -> Unit)? = null
     var onPlaybackCompleted: (() -> Unit)? = null
+    var onError: ((message: String) -> Unit)? = null
+
+    // 待播放队列：Service 未连接时暂存播放请求，连接后自动执行
+    private var pendingPlay: (() -> Unit)? = null
 
     private val playerListener = object : Player.Listener {
         override fun onIsPlayingChanged(isPlaying: Boolean) {
@@ -52,9 +56,17 @@ class MediaServiceConnection(private val context: Context) {
         )
         controllerFuture = MediaController.Builder(context, sessionToken).buildAsync().also { future ->
             future.addListener({
-                controller = future.get()
+                controller = try {
+                    future.get()
+                } catch (e: Exception) {
+                    onError?.invoke("播放服务连接失败: ${e.message}")
+                    return@addListener
+                }
                 controller?.addListener(playerListener)
                 onConnected?.invoke()
+                // 连接成功后，执行暂存的播放请求
+                pendingPlay?.invoke()
+                pendingPlay = null
             }, MoreExecutors.directExecutor())
         }
     }
@@ -73,22 +85,32 @@ class MediaServiceConnection(private val context: Context) {
 
     /**
      * 播放指定音频（assets 文件）
+     * Service 未连接时暂存请求，连接后自动播放
      */
     fun playAsset(assetFileName: String) {
-        val c = controller ?: return
-        c.setMediaItem(MediaItem.fromUri("asset:///$assetFileName"))
-        c.prepare()
-        c.play()
+        val action: () -> Unit = {
+            controller?.apply {
+                setMediaItem(MediaItem.fromUri("asset:///$assetFileName"))
+                prepare()
+                play()
+            }
+        }
+        if (controller != null) action() else pendingPlay = action
     }
 
     /**
      * 播放指定 URI（content:// 或 https://）
+     * Service 未连接时暂存请求，连接后自动播放
      */
     fun playUri(uriString: String) {
-        val c = controller ?: return
-        c.setMediaItem(MediaItem.fromUri(uriString))
-        c.prepare()
-        c.play()
+        val action: () -> Unit = {
+            controller?.apply {
+                setMediaItem(MediaItem.fromUri(uriString))
+                prepare()
+                play()
+            }
+        }
+        if (controller != null) action() else pendingPlay = action
     }
 
     fun play() { controller?.play() }

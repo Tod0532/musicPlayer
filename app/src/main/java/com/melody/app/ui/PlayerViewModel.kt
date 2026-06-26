@@ -41,7 +41,9 @@ data class PlayerUiState(
     val searchResults: List<com.melody.app.data.online.SearchResult> = emptyList(),  // 搜索结果（带播放链接）
     val isSearching: Boolean = false,   // 是否正在搜索
     val currentTab: Int = 0,            // 当前 Tab（0=我的, 1=搜索, 2=歌单）
-    val playlists: List<PlaylistEntity> = emptyList()  // 歌单列表
+    val playlists: List<PlaylistEntity> = emptyList(),  // 歌单列表
+    val playlistSongs: List<PlaylistSongEntity> = emptyList(),  // 当前歌单内的歌曲
+    val viewingPlaylistId: Long? = null  // 正在查看的歌单 ID（null=歌单列表页）
 ) {
     val currentSong: Song get() = songs.getOrElse(currentIndex) { songs.firstOrNull() ?: Song(0, "", "", "", 0L) }
     val progress: Float
@@ -128,6 +130,63 @@ class PlayerViewModel(private val application: Application) : AndroidViewModel(a
                     mediaUri = song.mediaUri
                 )
             )
+        }
+    }
+
+    /**
+     * 打开歌单详情（观察歌单内歌曲）
+     */
+    private var playlistSongsJob: kotlinx.coroutines.Job? = null
+
+    fun openPlaylistDetail(playlistId: Long) {
+        // 取消上一个歌单的观察
+        playlistSongsJob?.cancel()
+        _uiState.value = _uiState.value.copy(viewingPlaylistId = playlistId, playlistSongs = emptyList())
+        playlistSongsJob = viewModelScope.launch {
+            playlistDao.observeSongsInPlaylist(playlistId).collect { songs ->
+                _uiState.value = _uiState.value.copy(playlistSongs = songs)
+            }
+        }
+    }
+
+    /**
+     * 返回歌单列表（关闭详情）
+     */
+    fun closePlaylistDetail() {
+        playlistSongsJob?.cancel()
+        _uiState.value = _uiState.value.copy(viewingPlaylistId = null, playlistSongs = emptyList())
+    }
+
+    /**
+     * 播放歌单内的歌曲
+     */
+    fun playPlaylistSong(index: Int) {
+        val state = _uiState.value
+        val ps = state.playlistSongs.getOrNull(index) ?: return
+        // 转为 Song 并设为播放列表
+        val songs = state.playlistSongs.map { it.toSong() }
+        _uiState.value = state.copy(
+            songs = songs,
+            currentIndex = index,
+            playState = PlayState.PLAYING,
+            currentPosition = 0L,
+            isFullScreenPlayer = true,
+            duration = ps.duration,
+            lyrics = listOf(LyricLine(0, "暂无歌词"))
+        )
+        when {
+            ps.audioAsset != null -> mediaConnection.playAsset(ps.audioAsset)
+            ps.mediaUri != null -> mediaConnection.playUri(ps.mediaUri)
+            else -> mediaConnection.stop()
+        }
+    }
+
+    /**
+     * 从歌单移除歌曲
+     */
+    fun removeSongFromPlaylist(playlistId: Long, songId: Long) {
+        viewModelScope.launch {
+            playlistDao.removeSongFromPlaylist(playlistId, songId)
         }
     }
 

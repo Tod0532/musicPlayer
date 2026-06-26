@@ -150,12 +150,21 @@ fun MelodyApp(viewModel: PlayerViewModel = viewModel()) {
                         isSearching = uiState.isSearching,
                         onSongClick = { index -> viewModel.playSearchResult(index) }
                     )
-                    2 -> com.melody.app.ui.playlist.PlaylistScreen(
-                        playlists = uiState.playlists,
-                        onCreatePlaylist = { name -> viewModel.createPlaylist(name) },
-                        onDeletePlaylist = { playlist -> viewModel.deletePlaylist(playlist) },
-                        onPlaylistClick = { }
-                    )
+                    2 -> {
+                        val viewingPlaylist = uiState.playlists.find { it.id == uiState.viewingPlaylistId }
+                        com.melody.app.ui.playlist.PlaylistScreen(
+                            playlists = uiState.playlists,
+                            viewingPlaylist = viewingPlaylist,
+                            playlistSongs = uiState.playlistSongs,
+                            onCreatePlaylist = { name -> viewModel.createPlaylist(name) },
+                            onDeletePlaylist = { playlist -> viewModel.deletePlaylist(playlist) },
+                            onPlaylistClick = { playlist -> viewModel.openPlaylistDetail(playlist.id) },
+                            onBackToList = { viewModel.closePlaylistDetail() },
+                            onPlaySong = { index -> viewModel.playPlaylistSong(index) },
+                            onRemoveSong = { playlist, songId -> viewModel.removeSongFromPlaylist(playlist.id, songId) },
+                            onAddCurrentSong = { playlist -> viewModel.addCurrentSongToPlaylist(playlist.id) }
+                        )
+                    }
                     else -> MyMusicScreen(
                         songs = uiState.songs,
                         currentIndex = uiState.currentIndex,
