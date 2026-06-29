@@ -1,9 +1,11 @@
 package com.melody.app.data.news
 
 import com.melody.app.media.NewsTranslator
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.withContext
 
 /**
  * 资讯聚合仓库
@@ -17,19 +19,48 @@ object NewsRepository {
      */
     suspend fun fetchAllNews(): List<NewsItem> = coroutineScope {
         // 1. 并发抓取三个源
-        val hnDeferred = async { HackerNewsSource.fetch() }
-        val ghDeferred = async { GitHubTrendingSource.fetch() }
-        val rssDeferred = async { RSSHubSource.fetch() }
+        val hnDeferred = async {
+            try {
+                val r = HackerNewsSource.fetch()
+                System.err.println("MelodyNews: HackerNews=${r.size}条")
+                r
+            } catch (e: Exception) {
+                System.err.println("MelodyNews: HackerNews 失败: ${e.message}")
+                emptyList()
+            }
+        }
+        val ghDeferred = async {
+            try {
+                val r = GitHubTrendingSource.fetch()
+                System.err.println("MelodyNews: GitHub=${r.size}条")
+                r
+            } catch (e: Exception) {
+                System.err.println("MelodyNews: GitHub 失败: ${e.message}")
+                emptyList()
+            }
+        }
+        val rssDeferred = async {
+            try {
+                val r = RSSHubSource.fetch()
+                System.err.println("MelodyNews: RSSHub=${r.size}条")
+                r
+            } catch (e: Exception) {
+                System.err.println("MelodyNews: RSSHub 失败: ${e.message}")
+                emptyList()
+            }
+        }
 
         val hn = hnDeferred.await()
         val gh = ghDeferred.await()
         val rss = rssDeferred.await()
 
+        System.err.println("MelodyNews: 合计 HN=${hn.size} GH=${gh.size} RSS=${rss.size}")
+
         // 2. 合并 + 去重
         val merged = (hn + gh + rss)
             .distinctBy { normalizeTitle(it.title) }
 
-        // 3. 翻译英文内容为中文（HackerNews/GitHub 通常是英文）
+        // 3. 翻译英文内容为中文
         val translated = translateItems(merged)
 
         // 4. 按时间倒序排序
@@ -76,5 +107,35 @@ object NewsRepository {
         return title.lowercase()
             .replace(Regex("[^a-z0-9\\u4e00-\\u9fa5]"), "")
             .take(50)
+    }
+
+    /**
+     * 诊断：测试国内 AI 源的连通性
+     */
+    private suspend fun testChineseSources() = withContext(Dispatchers.IO) {
+        val sources = listOf(
+            "https://36kr.com/feed" to "36kr",
+            "https://www.jiqizhixin.com/rss" to "机器之心",
+            "https://www.qbitai.com/feed" to "量子位",
+            "https://juejin.cn" to "掘金",
+            "https://www.chinaz.com" to "站长之家",
+            "https://www.leiphone.com/feed" to "雷锋网"
+        )
+        for ((url, name) in sources) {
+            try {
+                val conn = (java.net.URL(url).openConnection() as java.net.HttpURLConnection).apply {
+                    requestMethod = "GET"
+                    setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 14)")
+                    connectTimeout = 6000
+                    readTimeout = 6000
+                    instanceFollowRedirects = true
+                }
+                val code = conn.responseCode
+                System.err.println("MelodyNews: $name ($url) -> HTTP $code")
+                conn.disconnect()
+            } catch (e: Exception) {
+                System.err.println("MelodyNews: $name ($url) -> 失败 ${e.message}")
+            }
+        }
     }
 }
