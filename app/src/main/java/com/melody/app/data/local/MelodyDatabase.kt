@@ -9,12 +9,18 @@ import androidx.room.RoomDatabase
  * 应用数据库
  */
 @Database(
-    entities = [PlaylistEntity::class, PlaylistSongEntity::class],
-    version = 1,
+    entities = [
+        PlaylistEntity::class,
+        PlaylistSongEntity::class,
+        NewsFavoriteEntity::class,
+        NewsHistoryEntity::class
+    ],
+    version = 2,
     exportSchema = false
 )
 abstract class MelodyDatabase : RoomDatabase() {
     abstract fun playlistDao(): PlaylistDao
+    abstract fun newsDao(): NewsDao
 
     companion object {
         @Volatile

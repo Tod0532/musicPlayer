@@ -165,14 +165,34 @@ class NewsPlayerController(context: Context) {
     val isPlaying: Boolean get() = isPlayingFlag
 
     /**
-     * 朗读指定条目
+     * 朗读指定条目（含分类板块过渡语）
      */
     private fun speakItem(index: Int) {
         val item = queue.getOrNull(index) ?: return
         currentIndex = index
-        val text = formatSpeech(item, index, queue.size)
+
+        // 板块过渡语：如果与前一条来源不同，加过渡语
+        val prevSource = queue.getOrNull(index - 1)?.source
+        val transition = if (prevSource != null && prevSource != item.source) {
+            "接下来是${sourceDisplayName(item.source)}板块。"
+        } else if (index == 0) {
+            "欢迎收听 AI 资讯。首先${sourceDisplayName(item.source)}板块。"
+        } else ""
+
+        val text = "$transition${formatSpeech(item, index, queue.size)}"
         tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, index.toString())
-        // onStateChanged 在 onStart 回调里触发
+    }
+
+    /**
+     * 来源显示名（口语化）
+     */
+    private fun sourceDisplayName(source: String): String = when (source) {
+        "HackerNews" -> "黑客新闻"
+        "GitHub" -> "开源项目"
+        "ArXiv" -> "前沿论文"
+        "机器之心" -> "机器之心"
+        "量子位" -> "量子位"
+        else -> source
     }
 
     /**

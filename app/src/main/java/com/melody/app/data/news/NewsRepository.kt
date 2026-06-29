@@ -15,56 +15,61 @@ import kotlinx.coroutines.withContext
 object NewsRepository {
 
     /**
-     * 抓取全部 AI 资讯（三源并发 + 英文翻译）
+     * 抓取全部 AI 资讯（三源并发 + 英文翻译 + 关键词过滤）
+     * @param context 用于关键词订阅（可为 null 表示不过滤）
      */
-    suspend fun fetchAllNews(): List<NewsItem> = coroutineScope {
-        // 1. 并发抓取三个源
+    suspend fun fetchAllNews(context: android.content.Context? = null): List<NewsItem> = coroutineScope {
+        // 1. 并发抓取四个源
         val hnDeferred = async {
-            try {
-                val r = HackerNewsSource.fetch()
-                System.err.println("MelodyNews: HackerNews=${r.size}条")
-                r
-            } catch (e: Exception) {
-                System.err.println("MelodyNews: HackerNews 失败: ${e.message}")
-                emptyList()
-            }
+            try { HackerNewsSource.fetch() } catch (_: Exception) { emptyList() }
         }
         val ghDeferred = async {
-            try {
-                val r = GitHubTrendingSource.fetch()
-                System.err.println("MelodyNews: GitHub=${r.size}条")
-                r
-            } catch (e: Exception) {
-                System.err.println("MelodyNews: GitHub 失败: ${e.message}")
-                emptyList()
-            }
+            try { GitHubTrendingSource.fetch() } catch (_: Exception) { emptyList() }
         }
         val rssDeferred = async {
-            try {
-                val r = RSSHubSource.fetch()
-                System.err.println("MelodyNews: RSSHub=${r.size}条")
-                r
-            } catch (e: Exception) {
-                System.err.println("MelodyNews: RSSHub 失败: ${e.message}")
-                emptyList()
-            }
+            try { RSSHubSource.fetch() } catch (_: Exception) { emptyList() }
+        }
+        val arxivDeferred = async {
+            try { ArxivSource.fetch() } catch (_: Exception) { emptyList() }
         }
 
         val hn = hnDeferred.await()
         val gh = ghDeferred.await()
         val rss = rssDeferred.await()
+        val arxiv = arxivDeferred.await()
 
-        System.err.println("MelodyNews: 合计 HN=${hn.size} GH=${gh.size} RSS=${rss.size}")
+        System.err.println("MelodyNews: 合计 HN=${hn.size} GH=${gh.size} RSS=${rss.size} ArXiv=${arxiv.size}")
 
         // 2. 合并 + 去重
-        val merged = (hn + gh + rss)
+        val merged = (hn + gh + rss + arxiv)
             .distinctBy { normalizeTitle(it.title) }
 
         // 3. 翻译英文内容为中文
         val translated = translateItems(merged)
 
-        // 4. 按时间倒序排序
-        translated.sortedByDescending { it.publishedAt }
+        // 4. 按来源分类排序（同类连续，播报时按板块过渡）
+        val sourceOrder = listOf(
+            NewsItem.SOURCE_GITHUB,
+            NewsItem.SOURCE_HACKERNEWS,
+            NewsItem.SOURCE_ARXIV,
+            NewsItem.SOURCE_JIQIZHIXIN,
+            NewsItem.SOURCE_QBITAI
+        )
+        val sorted = translated.sortedWith(
+            compareBy<NewsItem> { sourceOrder.indexOf(it.source).let { i -> if (i < 0) 99 else i } }
+                .thenByDescending { it.publishedAt }
+        )
+
+        // 5. 关键词过滤（用户订阅了关键词则只保留匹配的）
+        val keywordSubscription = context?.let { KeywordSubscription.getInstance(it) }
+        val filtered = if (keywordSubscription != null) {
+            sorted.filter { keywordSubscription.matches(it) }
+        } else {
+            sorted
+        }
+        System.err.println("MelodyNews: 关键词过滤后 ${filtered.size} 条")
+
+        filtered
     }
 
     /**

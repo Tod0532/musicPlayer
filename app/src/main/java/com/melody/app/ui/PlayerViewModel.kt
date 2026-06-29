@@ -106,6 +106,8 @@ class PlayerViewModel(private val application: Application) : AndroidViewModel(a
     // Room 数据库（歌单管理）
     private val database = MelodyDatabase.getInstance(application)
     private val playlistDao = database.playlistDao()
+    private val newsDao = database.newsDao()
+    private val keywordSubscription = com.melody.app.data.news.KeywordSubscription.getInstance(application)
 
     private var progressJob: kotlinx.coroutines.Job? = null
 
@@ -482,7 +484,7 @@ class PlayerViewModel(private val application: Application) : AndroidViewModel(a
         _uiState.value = _uiState.value.copy(isFetchingNews = true)
         viewModelScope.launch {
             val news = withContext(Dispatchers.IO) {
-                com.melody.app.data.news.NewsRepository.fetchAllNews()
+                com.melody.app.data.news.NewsRepository.fetchAllNews(application)
             }
             _uiState.value = _uiState.value.copy(
                 newsItems = news,
@@ -505,6 +507,7 @@ class PlayerViewModel(private val application: Application) : AndroidViewModel(a
             newsIndex = 0
         )
         newsPlayer.startPlayback(items, 0)
+        recordNewsHistory(items[0])
     }
 
     /**
@@ -520,6 +523,7 @@ class PlayerViewModel(private val application: Application) : AndroidViewModel(a
             newsIndex = index
         )
         newsPlayer.startPlayback(items, index)
+        recordNewsHistory(items[index])
     }
 
     fun newsPlayPause() {
@@ -547,6 +551,61 @@ class PlayerViewModel(private val application: Application) : AndroidViewModel(a
             isNewsPlaying = false,
             isNewsFullScreen = false
         )
+    }
+
+    // ============ 收藏 / 历史 / 关键词 ============
+
+    // 收藏列表（Flow 观察）
+    val favoriteNews = newsDao.observeFavorites()
+
+    /**
+     * 切换收藏状态
+     */
+    fun toggleNewsFavorite(item: com.melody.app.data.news.NewsItem) {
+        viewModelScope.launch {
+            if (newsDao.isFavorite(item.id)) {
+                newsDao.removeFavorite(item.id)
+            } else {
+                newsDao.addFavorite(
+                    com.melody.app.data.local.NewsFavoriteEntity(
+                        newsId = item.id,
+                        title = item.title,
+                        summary = item.summary,
+                        source = item.source,
+                        url = item.url
+                    )
+                )
+            }
+        }
+    }
+
+    /**
+     * 记录播放历史（播报一条时调用）
+     */
+    fun recordNewsHistory(item: com.melody.app.data.news.NewsItem) {
+        viewModelScope.launch {
+            newsDao.addHistory(
+                com.melody.app.data.local.NewsHistoryEntity(
+                    newsId = item.id,
+                    title = item.title,
+                    source = item.source
+                )
+            )
+        }
+    }
+
+    /**
+     * 关键词管理
+     */
+    fun addKeyword(keyword: String): Boolean = keywordSubscription.addKeyword(keyword)
+    fun removeKeyword(keyword: String) = keywordSubscription.removeKeyword(keyword)
+    fun getKeywords(): List<String> = keywordSubscription.getKeywords()
+
+    /**
+     * 重新抓取（关键词变更后用）
+     */
+    fun refreshNewsWithKeywords() {
+        fetchNews()
     }
 
     override fun onCleared() {
