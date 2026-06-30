@@ -47,38 +47,35 @@ object NewsRepository {
         // 3. 翻译英文内容为中文
         val translated = translateItems(merged)
 
-        // 4. 按来源分类排序（同类连续，播报时按板块过渡）
-        val sourceOrder = listOf(
-            // 顶级媒体优先
-            NewsItem.SOURCE_TECHCRUNCH,
-            NewsItem.SOURCE_VERGE,
-            "WIRED",
-            "VentureBeat",
-            NewsItem.SOURCE_MIT,
-            // 官方动态
-            NewsItem.SOURCE_ANTHROPIC,
-            // 技术社区
-            NewsItem.SOURCE_HACKERNEWS,
-            NewsItem.SOURCE_DEVTO,
-            // 学术
-            NewsItem.SOURCE_ARXIV,
-            NewsItem.SOURCE_JIQIZHIXIN,
-            NewsItem.SOURCE_QBITAI
-        )
-        val sorted = translated.sortedWith(
-            compareBy<NewsItem> { sourceOrder.indexOf(it.source).let { i -> if (i < 0) 99 else i } }
-                .thenByDescending { it.publishedAt }
-        )
+        // 4. 时效性过滤：只保留最近 48 小时的内容
+        val cutoff = System.currentTimeMillis() - 48 * 3600 * 1000L
+        val fresh = translated.filter { it.publishedAt > cutoff || it.publishedAt == 0L }
 
-        // 5. 关键词过滤（用户订阅了关键词则只保留匹配的）
-        val keywordSubscription = context?.let { KeywordSubscription.getInstance(it) }
-        val filtered = if (keywordSubscription != null) {
-            sorted.filter { keywordSubscription.matches(it) }
-        } else {
-            sorted
+        // 5. 跨源去重合并：同一新闻在多个源出现时，保留质量最高的版本
+        val deduplicated = mergeDuplicates(fresh)
+
+        // 6. 质量评分排序（多维度打分）
+        val scored = deduplicated.map { it to calculateQualityScore(it) }
+            .sortedByDescending { it.second }
+            .map { it.first }
+
+        // 7. 中文优先：已翻译成中文的内容排在前面
+        val chineseFirst = scored.sortedByDescending { item ->
+            val title = item.title
+            val cjkCount = title.count { it in '\u4e00'..'\u9fff' }
+            val totalCount = title.length.coerceAtLeast(1)
+            cjkCount.toFloat() / totalCount  // 中文占比越高越靠前
         }
 
-        // 6. 摘要增强：提取核心观点
+        // 8. 关键词过滤（用户订阅了关键词则只保留匹配的）
+        val keywordSubscription = context?.let { KeywordSubscription.getInstance(it) }
+        val filtered = if (keywordSubscription != null) {
+            chineseFirst.filter { keywordSubscription.matches(it) }
+        } else {
+            chineseFirst
+        }
+
+        // 9. 摘要增强：提取核心观点
         val enriched = filtered.map { item ->
             val corePoint = extractCorePoint(item.summary)
             item.copy(summary = if (corePoint.isNotBlank() && corePoint != item.summary) {
@@ -86,8 +83,103 @@ object NewsRepository {
             } else item.summary)
         }
 
-        System.err.println("MelodyNews: 最终 ${enriched.size} 条")
+        System.err.println("MelodyNews: 最终 ${enriched.size} 条（去重后 ${deduplicated.size}，时效过滤后 ${fresh.size}）")
         enriched
+    }
+
+    /**
+     * 质量评分：多维度打分（0-100）
+     * 来源权重(40%) + 时效性(30%) + 互动数(20%) + 中文质量(10%)
+     */
+    private fun calculateQualityScore(item: NewsItem): Float {
+        // 来源权重（顶级媒体最高）
+        val sourceWeight = when (item.source) {
+            NewsItem.SOURCE_TECHCRUNCH -> 40f
+            NewsItem.SOURCE_VERGE -> 38f
+            "WIRED" -> 36f
+            "VentureBeat" -> 34f
+            NewsItem.SOURCE_ANTHROPIC -> 32f
+            NewsItem.SOURCE_HACKERNEWS -> 25f
+            NewsItem.SOURCE_DEVTO -> 20f
+            NewsItem.SOURCE_ARXIV -> 15f
+            else -> 10f
+        }
+
+        // 时效性（越新越高，48小时内线性衰减）
+        val ageHours = (System.currentTimeMillis() - item.publishedAt) / 3_600_000f
+        val freshness = when {
+            ageHours < 0 -> 30f  // 无时间戳
+            ageHours < 6 -> 30f
+            ageHours < 24 -> 25f
+            ageHours < 48 -> 15f
+            else -> 5f
+        }
+
+        // 互动数（score 对数缩放）
+        val engagement = when {
+            item.score > 1000 -> 20f
+            item.score > 100 -> 15f
+            item.score > 10 -> 10f
+            item.score > 0 -> 5f
+            else -> 0f
+        }
+
+        // 中文质量（标题中文占比）
+        val title = item.title
+        val cjkRatio = if (title.isNotEmpty()) {
+            title.count { it in '\u4e00'..'\u9fff' }.toFloat() / title.length
+        } else 0f
+        val chineseQuality = cjkRatio * 10f
+
+        return sourceWeight + freshness + engagement + chineseQuality
+    }
+
+    /**
+     * 跨源去重合并：同一新闻在多个源出现时，保留质量最高的版本
+     * 策略：标题相似度 > 80% 视为同一新闻
+     */
+    private fun mergeDuplicates(items: List<NewsItem>): List<NewsItem> {
+        if (items.size <= 1) return items
+
+        val groups = mutableListOf<MutableList<NewsItem>>()
+        val used = BooleanArray(items.size)
+
+        for (i in items.indices) {
+            if (used[i]) continue
+            val group = mutableListOf(items[i])
+            used[i] = true
+
+            for (j in i + 1 until items.size) {
+                if (used[j]) continue
+                if (isSameStory(items[i], items[j])) {
+                    group.add(items[j])
+                    used[j] = true
+                }
+            }
+            groups.add(group)
+        }
+
+        // 每组保留质量最高的版本
+        return groups.map { group ->
+            group.maxByOrNull { calculateQualityScore(it) } ?: group.first()
+        }
+    }
+
+    /**
+     * 判断两条新闻是否是同一故事
+     * 标题相似度 > 60% 视为同一新闻
+     */
+    private fun isSameStory(a: NewsItem, b: NewsItem): Boolean {
+        val titleA = normalizeTitle(a.title)
+        val titleB = normalizeTitle(b.title)
+        if (titleA == titleB) return true
+
+        // 简单相似度：共同字符数 / 较长标题长度
+        val commonChars = titleA.toSet().intersect(titleB.toSet()).size
+        val maxLength = maxOf(titleA.length, titleB.length, 1)
+        val similarity = commonChars.toFloat() / maxLength
+
+        return similarity > 0.6f
     }
 
     /**
