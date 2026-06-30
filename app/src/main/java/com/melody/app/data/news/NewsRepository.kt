@@ -77,9 +77,27 @@ object NewsRepository {
         } else {
             sorted
         }
-        System.err.println("MelodyNews: 关键词过滤后 ${filtered.size} 条")
 
-        filtered
+        // 6. 摘要增强：提取核心观点
+        val enriched = filtered.map { item ->
+            val corePoint = extractCorePoint(item.summary)
+            item.copy(summary = if (corePoint.isNotBlank() && corePoint != item.summary) {
+                "${item.summary}。核心观点：$corePoint"
+            } else item.summary)
+        }
+
+        System.err.println("MelodyNews: 最终 ${enriched.size} 条")
+        enriched
+    }
+
+    /**
+     * 从摘要中提取核心观点（第一个完整句子）
+     */
+    private fun extractCorePoint(summary: String): String {
+        if (summary.isBlank()) return ""
+        // 取第一个句号/感叹号/问号前的内容
+        val firstSentence = summary.split(Regex("[。！？.!?]"))[0].trim()
+        return if (firstSentence.length > 10) firstSentence else summary.take(100)
     }
 
     /**
@@ -132,11 +150,14 @@ object NewsRepository {
     }
 
     /**
-     * 标题归一化（用于去重）：转小写 + 去空格标点
+     * 标题归一化（用于去重）：转小写 + 去空格标点 + 取核心词
+     * 改进：去除常见前缀后缀，提高跨源去重准确率
      */
     private fun normalizeTitle(title: String): String {
-        return title.lowercase()
-            .replace(Regex("[^a-z0-9\\u4e00-\\u9fa5]"), "")
-            .take(50)
+        var t = title.lowercase()
+            .replace(Regex("[^a-z0-9\\u4e00-\\u9fa5]"), "")  // 只保留字母数字中文
+        // 去除常见前缀后缀（如"【新项目】"、"opinion:"等）
+        t = t.replace(Regex("^(新项目|opinion|review|howto|howto)"), "")
+        return t.take(60)  // 取前60字符（比之前50更长，提高匹配率）
     }
 }
