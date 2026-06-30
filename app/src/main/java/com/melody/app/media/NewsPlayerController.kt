@@ -27,67 +27,74 @@ class NewsPlayerController(context: Context) {
     var onTtsNotAvailable: (() -> Unit)? = null
 
     init {
-        tts = TextToSpeech(context) { status ->
-            if (status == TextToSpeech.SUCCESS) {
-                val result = tts?.setLanguage(Locale.CHINESE)
-                // CHINESE 不一定可用，尝试 SIMPLIFIED_CHINESE 或回退
-                if (result == TextToSpeech.LANG_MISSING_DATA || result == TextToSpeech.LANG_NOT_SUPPORTED) {
-                    tts?.setLanguage(Locale.SIMPLIFIED_CHINESE)
-                }
-                // 语速：0.9 = 稍慢，新闻播报更清晰自然
-                tts?.setSpeechRate(0.9f)
-                // 音调：1.0 默认，略低更沉稳
-                tts?.setPitch(0.95f)
-                isReady = true
-                // 引擎就绪后执行暂存的播放请求
-                pendingStart?.let { items ->
-                    pendingStart = null
-                    startPlayback(items, 0)
-                }
-            } else {
-                onTtsNotAvailable?.invoke()
-            }
+        // 显式指定 Google TTS 引擎（质量最高）
+        // 如果设备没有 Google TTS，回退到系统默认
+        val googleTtsEngine = "com.google.android.tts"
+        tts = try {
+            TextToSpeech(context, { status ->
+                initTts(status)
+            }, googleTtsEngine)
+        } catch (e: Exception) {
+            // Google TTS 不可用，回退到系统默认
+            TextToSpeech(context) { status -> initTts(status) }
         }
+    }
 
-        // 监听朗读进度
-        tts?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
-            override fun onStart(utteranceId: String?) {
-                val idx = utteranceId?.toIntOrNull() ?: return
-                currentIndex = idx
-                isPlayingFlag = true
-                onStateChanged?.invoke(true, currentIndex, queue.size)
+    private fun initTts(status: Int) {
+        if (status == TextToSpeech.SUCCESS) {
+            val result = tts?.setLanguage(Locale.CHINESE)
+            if (result == TextToSpeech.LANG_MISSING_DATA || result == TextToSpeech.LANG_NOT_SUPPORTED) {
+                tts?.setLanguage(Locale.SIMPLIFIED_CHINESE)
             }
+            // 语速：0.85 = 更慢，新闻播报更清晰自然
+            tts?.setSpeechRate(0.85f)
+            // 音调：0.95 = 略低，更沉稳自然
+            tts?.setPitch(0.95f)
 
-            override fun onDone(utteranceId: String?) {
-                // 当前条朗读完成，自动播下一条
-                val next = currentIndex + 1
-                if (next < queue.size) {
-                    speakItem(next)
-                } else {
-                    // 全部播完
+            // 监听朗读进度
+            tts?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
+                override fun onStart(utteranceId: String?) {
+                    val idx = utteranceId?.toIntOrNull() ?: return
+                    currentIndex = idx
+                    isPlayingFlag = true
+                    onStateChanged?.invoke(true, currentIndex, queue.size)
+                }
+
+                override fun onDone(utteranceId: String?) {
+                    val next = currentIndex + 1
+                    if (next < queue.size) {
+                        speakItem(next)
+                    } else {
+                        isPlayingFlag = false
+                        onStateChanged?.invoke(false, currentIndex, queue.size)
+                        onCompleted?.invoke()
+                    }
+                }
+
+                @Deprecated("Deprecated in Java", ReplaceWith(""))
+                override fun onError(utteranceId: String?) {
                     isPlayingFlag = false
                     onStateChanged?.invoke(false, currentIndex, queue.size)
-                    onCompleted?.invoke()
+                    val next = currentIndex + 1
+                    if (next < queue.size) speakItem(next)
                 }
-            }
 
-            @Deprecated("Deprecated in Java", ReplaceWith(""))
-            override fun onError(utteranceId: String?) {
-                // 朗读出错：标记停止，自动跳到下一条
-                isPlayingFlag = false
-                onStateChanged?.invoke(false, currentIndex, queue.size)
-                val next = currentIndex + 1
-                if (next < queue.size) speakItem(next)
-            }
+                override fun onError(utteranceId: String?, errorCode: Int) {
+                    isPlayingFlag = false
+                    onStateChanged?.invoke(false, currentIndex, queue.size)
+                    val next = currentIndex + 1
+                    if (next < queue.size) speakItem(next)
+                }
+            })
 
-            override fun onError(utteranceId: String?, errorCode: Int) {
-                // 新版 API 的 onError（带错误码），同样跳下一条
-                isPlayingFlag = false
-                onStateChanged?.invoke(false, currentIndex, queue.size)
-                val next = currentIndex + 1
-                if (next < queue.size) speakItem(next)
+            isReady = true
+            pendingStart?.let { items ->
+                pendingStart = null
+                startPlayback(items, 0)
             }
-        })
+        } else {
+            onTtsNotAvailable?.invoke()
+        }
     }
 
     /**
