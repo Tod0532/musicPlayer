@@ -205,13 +205,13 @@ class NewsPlayerController(context: Context) {
      */
     private fun formatSpeech(item: NewsItem, index: Int, total: Int): String {
         return buildString {
-            // 条数信息
             append("第${index + 1}条，共$total 条。")
-            // 来源
             append("来自${item.source}。")
-            // 标题（稍作停顿）
+            // 作者（如果有）
+            if (item.author.isNotBlank()) {
+                append("作者${item.author}。")
+            }
             append("${item.title}。。")
-            // 摘要（如果是最后一条，加结束语）
             if (index == total - 1) {
                 append("${item.summary}。以上就是今天的全部 AI 资讯，感谢收听。")
             } else {

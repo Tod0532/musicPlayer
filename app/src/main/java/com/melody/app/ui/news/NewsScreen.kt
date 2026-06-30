@@ -184,6 +184,19 @@ private fun NewsCard(
                     .background(Color(item.sourceColor).copy(alpha = 0.15f))
                     .padding(horizontal = 6.dp, vertical = 2.dp)
             )
+            // 分类标签（如果有）
+            if (item.category.isNotBlank()) {
+                Spacer(Modifier.width(6.dp))
+                Text(
+                    text = item.category,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f))
+                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                )
+            }
             Spacer(Modifier.width(8.dp))
             // 热度
             if (item.score > 0) {
@@ -221,11 +234,22 @@ private fun NewsCard(
             )
         }
         Spacer(Modifier.height(4.dp))
-        Text(
-            text = timeAgo,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
-        )
+        // 时间 + 作者
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                text = timeAgo,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
+            )
+            if (item.author.isNotBlank()) {
+                Text(
+                    text = " · ${item.author}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
+                    maxLines = 1
+                )
+            }
+        }
     }
 }
 

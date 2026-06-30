@@ -10,7 +10,9 @@ data class NewsItem(
     val source: String,       // 来源
     val url: String,          // 原文链接
     val publishedAt: Long,    // 发布时间戳（毫秒）
-    val score: Int = 0        // 热度
+    val score: Int = 0,       // 热度
+    val author: String = "",  // 作者
+    val category: String = "" // 分类（如"开源项目""论文""博客"）
 ) {
     /**
      * 来源标识颜色（用于 UI 标签）

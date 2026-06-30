@@ -54,6 +54,9 @@ object DevToSource {
                     val comments = obj.optInt("comments_count", 0)
                     val readingTime = obj.optInt("reading_time_minutes", 0)
                     val tags = obj.optString("tag_list", "").trim()
+                    val author = obj.getJSONObject("user").optString("name", "").ifBlank {
+                        obj.getJSONObject("user").optString("username", "")
+                    }
 
                     // 增强摘要：描述 + 阅读时长 + 标签
                     val enhancedSummary = buildString {
@@ -71,7 +74,9 @@ object DevToSource {
                             source = "Dev.to",
                             url = url,
                             publishedAt = parseDate(publishedAt),
-                            score = positiveReactions
+                            score = positiveReactions,
+                            author = author,
+                            category = "技术博客"
                         )
                     )
                 }

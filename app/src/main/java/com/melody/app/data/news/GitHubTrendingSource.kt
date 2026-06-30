@@ -66,7 +66,9 @@ object GitHubTrendingSource {
                             source = NewsItem.SOURCE_GITHUB,
                             url = url,
                             publishedAt = now,
-                            score = stars + todayStars
+                            score = stars + todayStars,
+                            author = repoPath.substringBefore("/"),
+                            category = "开源项目"
                         )
                     )
                 } catch (_: Exception) { /* 跳过单条 */ }
