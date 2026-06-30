@@ -24,6 +24,9 @@ data class NewsItem(
         SOURCE_QBITAI -> 0xFF31C27C        // 量子位 青
         SOURCE_ARXIV -> 0xFFA78BFA         // ArXiv 紫
         SOURCE_DEVTO -> 0xFF60A5FA          // Dev.to 蓝
+        SOURCE_TECHCRUNCH -> 0xFF00D100       // TechCrunch 绿
+        SOURCE_VERGE -> 0xFFE847C7            // Verge 粉
+        SOURCE_MIT -> 0xFFFF3B30              // MIT 红
         else -> 0xFF94A3B8
     }
 
@@ -34,6 +37,9 @@ data class NewsItem(
         const val SOURCE_QBITAI = "量子位"
         const val SOURCE_ARXIV = "ArXiv"
         const val SOURCE_DEVTO = "Dev.to"
+        const val SOURCE_TECHCRUNCH = "TechCrunch"
+        const val SOURCE_VERGE = "The Verge"
+        const val SOURCE_MIT = "MIT Tech Review"
 
         /**
          * AI 关键词过滤列表（小写匹配）

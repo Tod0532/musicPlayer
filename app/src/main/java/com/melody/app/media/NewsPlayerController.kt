@@ -195,6 +195,9 @@ class NewsPlayerController(context: Context) {
         "GitHub" -> "开源项目"
         "ArXiv" -> "前沿论文"
         "Dev.to" -> "技术博客"
+        "TechCrunch" -> "TechCrunch科技新闻"
+        "The Verge" -> "The Verge深度报道"
+        "MIT Tech Review" -> "麻省理工技术评论"
         "机器之心" -> "机器之心"
         "量子位" -> "量子位"
         else -> source

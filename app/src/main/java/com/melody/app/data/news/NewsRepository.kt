@@ -35,17 +35,21 @@ object NewsRepository {
         val devtoDeferred = async {
             try { DevToSource.fetch() } catch (_: Exception) { emptyList() }
         }
+        val techMediaDeferred = async {
+            try { TechMediaSource.fetch() } catch (_: Exception) { emptyList() }
+        }
 
         val hn = hnDeferred.await()
         val gh = ghDeferred.await()
         val rss = rssDeferred.await()
         val arxiv = arxivDeferred.await()
         val devto = devtoDeferred.await()
+        val techMedia = techMediaDeferred.await()
 
-        System.err.println("MelodyNews: HN=${hn.size} GH=${gh.size} RSS=${rss.size} ArXiv=${arxiv.size} DevTo=${devto.size}")
+        System.err.println("MelodyNews: HN=${hn.size} GH=${gh.size} RSS=${rss.size} ArXiv=${arxiv.size} DevTo=${devto.size} TechMedia=${techMedia.size}")
 
         // 2. 合并 + 去重
-        val merged = (hn + gh + rss + arxiv + devto)
+        val merged = (hn + gh + rss + arxiv + devto + techMedia)
             .distinctBy { normalizeTitle(it.title) }
 
         // 3. 翻译英文内容为中文
@@ -53,9 +57,15 @@ object NewsRepository {
 
         // 4. 按来源分类排序（同类连续，播报时按板块过渡）
         val sourceOrder = listOf(
+            // 顶级媒体优先（最重要）
+            NewsItem.SOURCE_TECHCRUNCH,
+            NewsItem.SOURCE_VERGE,
+            NewsItem.SOURCE_MIT,
+            NewsItem.SOURCE_HACKERNEWS,
+            // 其次开发者内容
             NewsItem.SOURCE_DEVTO,
             NewsItem.SOURCE_GITHUB,
-            NewsItem.SOURCE_HACKERNEWS,
+            // 最后学术
             NewsItem.SOURCE_ARXIV,
             NewsItem.SOURCE_JIQIZHIXIN,
             NewsItem.SOURCE_QBITAI
