@@ -15,11 +15,11 @@ import kotlinx.coroutines.withContext
 object NewsRepository {
 
     /**
-     * 抓取全部 AI 资讯（三源并发 + 英文翻译 + 关键词过滤）
+     * 抓取全部 AI 资讯（五源并发 + 英文翻译 + 关键词过滤）
      * @param context 用于关键词订阅（可为 null 表示不过滤）
      */
     suspend fun fetchAllNews(context: android.content.Context? = null): List<NewsItem> = coroutineScope {
-        // 1. 并发抓取四个源
+        // 1. 并发抓取五个源
         val hnDeferred = async {
             try { HackerNewsSource.fetch() } catch (_: Exception) { emptyList() }
         }
@@ -32,16 +32,20 @@ object NewsRepository {
         val arxivDeferred = async {
             try { ArxivSource.fetch() } catch (_: Exception) { emptyList() }
         }
+        val devtoDeferred = async {
+            try { DevToSource.fetch() } catch (_: Exception) { emptyList() }
+        }
 
         val hn = hnDeferred.await()
         val gh = ghDeferred.await()
         val rss = rssDeferred.await()
         val arxiv = arxivDeferred.await()
+        val devto = devtoDeferred.await()
 
-        System.err.println("MelodyNews: 合计 HN=${hn.size} GH=${gh.size} RSS=${rss.size} ArXiv=${arxiv.size}")
+        System.err.println("MelodyNews: HN=${hn.size} GH=${gh.size} RSS=${rss.size} ArXiv=${arxiv.size} DevTo=${devto.size}")
 
         // 2. 合并 + 去重
-        val merged = (hn + gh + rss + arxiv)
+        val merged = (hn + gh + rss + arxiv + devto)
             .distinctBy { normalizeTitle(it.title) }
 
         // 3. 翻译英文内容为中文
@@ -49,6 +53,7 @@ object NewsRepository {
 
         // 4. 按来源分类排序（同类连续，播报时按板块过渡）
         val sourceOrder = listOf(
+            NewsItem.SOURCE_DEVTO,
             NewsItem.SOURCE_GITHUB,
             NewsItem.SOURCE_HACKERNEWS,
             NewsItem.SOURCE_ARXIV,
@@ -112,35 +117,5 @@ object NewsRepository {
         return title.lowercase()
             .replace(Regex("[^a-z0-9\\u4e00-\\u9fa5]"), "")
             .take(50)
-    }
-
-    /**
-     * 诊断：测试国内 AI 源的连通性
-     */
-    private suspend fun testChineseSources() = withContext(Dispatchers.IO) {
-        val sources = listOf(
-            "https://36kr.com/feed" to "36kr",
-            "https://www.jiqizhixin.com/rss" to "机器之心",
-            "https://www.qbitai.com/feed" to "量子位",
-            "https://juejin.cn" to "掘金",
-            "https://www.chinaz.com" to "站长之家",
-            "https://www.leiphone.com/feed" to "雷锋网"
-        )
-        for ((url, name) in sources) {
-            try {
-                val conn = (java.net.URL(url).openConnection() as java.net.HttpURLConnection).apply {
-                    requestMethod = "GET"
-                    setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 14)")
-                    connectTimeout = 6000
-                    readTimeout = 6000
-                    instanceFollowRedirects = true
-                }
-                val code = conn.responseCode
-                System.err.println("MelodyNews: $name ($url) -> HTTP $code")
-                conn.disconnect()
-            } catch (e: Exception) {
-                System.err.println("MelodyNews: $name ($url) -> 失败 ${e.message}")
-            }
-        }
     }
 }

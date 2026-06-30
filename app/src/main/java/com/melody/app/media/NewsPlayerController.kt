@@ -190,6 +190,7 @@ class NewsPlayerController(context: Context) {
         "HackerNews" -> "黑客新闻"
         "GitHub" -> "开源项目"
         "ArXiv" -> "前沿论文"
+        "Dev.to" -> "技术博客"
         "机器之心" -> "机器之心"
         "量子位" -> "量子位"
         else -> source

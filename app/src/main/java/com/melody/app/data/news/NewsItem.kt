@@ -21,6 +21,7 @@ data class NewsItem(
         SOURCE_JIQIZHIXIN -> 0xFF31C27C    // 机器之心 青
         SOURCE_QBITAI -> 0xFF31C27C        // 量子位 青
         SOURCE_ARXIV -> 0xFFA78BFA         // ArXiv 紫
+        SOURCE_DEVTO -> 0xFF60A5FA          // Dev.to 蓝
         else -> 0xFF94A3B8
     }
 
@@ -30,6 +31,7 @@ data class NewsItem(
         const val SOURCE_JIQIZHIXIN = "机器之心"
         const val SOURCE_QBITAI = "量子位"
         const val SOURCE_ARXIV = "ArXiv"
+        const val SOURCE_DEVTO = "Dev.to"
 
         /**
          * AI 关键词过滤列表（小写匹配）
