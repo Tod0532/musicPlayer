@@ -197,6 +197,8 @@ class NewsPlayerController(context: Context) {
         "Dev.to" -> "技术博客"
         "TechCrunch" -> "TechCrunch科技新闻"
         "The Verge" -> "The Verge深度报道"
+        "WIRED" -> "连线杂志科技洞察"
+        "VentureBeat" -> "VentureBeat AI商业"
         "MIT Tech Review" -> "麻省理工技术评论"
         "机器之心" -> "机器之心"
         "量子位" -> "量子位"

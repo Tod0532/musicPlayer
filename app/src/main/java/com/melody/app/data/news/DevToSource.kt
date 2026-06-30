@@ -82,7 +82,8 @@ object DevToSource {
                 }
             }
         } catch (_: Exception) { }
-        result
+        // 质量过滤：只保留点赞数 ≥ 5 的（淘汰低质量内容）
+        result.filter { it.score >= 5 }
     }
 
     private fun parseDate(isoDate: String): Long {

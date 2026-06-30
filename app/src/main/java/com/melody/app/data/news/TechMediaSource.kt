@@ -24,19 +24,25 @@ object TechMediaSource {
             url = "https://techcrunch.com/category/artificial-intelligence/feed/",
             source = "TechCrunch",
             category = "行业新闻",
-            color = 0xFF00D100  // TechCrunch 绿
+            color = 0xFF00D100
         ),
         FeedConfig(
             url = "https://www.theverge.com/rss/ai-artificial-intelligence/index.xml",
             source = "The Verge",
             category = "深度报道",
-            color = 0xFFE847C7  // Verge 粉
+            color = 0xFFE847C7
         ),
         FeedConfig(
-            url = "https://www.technologyreview.com/feed/",
-            source = "MIT Tech Review",
-            category = "前沿视角",
-            color = 0xFFFF3B30  // MIT 红
+            url = "https://www.wired.com/feed/tag/ai/latest/rss",
+            source = "WIRED",
+            category = "科技洞察",
+            color = 0xFF000000.toLong().or(0xFF888888)  // WIRED 灰
+        ),
+        FeedConfig(
+            url = "https://venturebeat.com/category/ai/feed/",
+            source = "VentureBeat",
+            category = "AI商业",
+            color = 0xFFFF6B35  // VB 橙
         )
     )
 

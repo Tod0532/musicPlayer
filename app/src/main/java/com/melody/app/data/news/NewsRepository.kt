@@ -19,15 +19,9 @@ object NewsRepository {
      * @param context 用于关键词订阅（可为 null 表示不过滤）
      */
     suspend fun fetchAllNews(context: android.content.Context? = null): List<NewsItem> = coroutineScope {
-        // 1. 并发抓取五个源
+        // 1. 并发抓取（精简为高质量源，砍掉不稳定的 RSSHub 和反爬的 GitHub）
         val hnDeferred = async {
             try { HackerNewsSource.fetch() } catch (_: Exception) { emptyList() }
-        }
-        val ghDeferred = async {
-            try { GitHubTrendingSource.fetch() } catch (_: Exception) { emptyList() }
-        }
-        val rssDeferred = async {
-            try { RSSHubSource.fetch() } catch (_: Exception) { emptyList() }
         }
         val arxivDeferred = async {
             try { ArxivSource.fetch() } catch (_: Exception) { emptyList() }
@@ -40,16 +34,14 @@ object NewsRepository {
         }
 
         val hn = hnDeferred.await()
-        val gh = ghDeferred.await()
-        val rss = rssDeferred.await()
         val arxiv = arxivDeferred.await()
         val devto = devtoDeferred.await()
         val techMedia = techMediaDeferred.await()
 
-        System.err.println("MelodyNews: HN=${hn.size} GH=${gh.size} RSS=${rss.size} ArXiv=${arxiv.size} DevTo=${devto.size} TechMedia=${techMedia.size}")
+        System.err.println("MelodyNews: HN=${hn.size} ArXiv=${arxiv.size} DevTo=${devto.size} TechMedia=${techMedia.size}")
 
         // 2. 合并 + 去重
-        val merged = (hn + gh + rss + arxiv + devto + techMedia)
+        val merged = (techMedia + hn + devto + arxiv)
             .distinctBy { normalizeTitle(it.title) }
 
         // 3. 翻译英文内容为中文
@@ -57,9 +49,11 @@ object NewsRepository {
 
         // 4. 按来源分类排序（同类连续，播报时按板块过渡）
         val sourceOrder = listOf(
-            // 顶级媒体优先（最重要）
+            // 顶级媒体优先
             NewsItem.SOURCE_TECHCRUNCH,
             NewsItem.SOURCE_VERGE,
+            "WIRED",
+            "VentureBeat",
             NewsItem.SOURCE_MIT,
             NewsItem.SOURCE_HACKERNEWS,
             // 其次开发者内容
