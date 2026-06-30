@@ -34,6 +34,10 @@ class NewsPlayerController(context: Context) {
                 if (result == TextToSpeech.LANG_MISSING_DATA || result == TextToSpeech.LANG_NOT_SUPPORTED) {
                     tts?.setLanguage(Locale.SIMPLIFIED_CHINESE)
                 }
+                // 语速：0.9 = 稍慢，新闻播报更清晰自然
+                tts?.setSpeechRate(0.9f)
+                // 音调：1.0 默认，略低更沉稳
+                tts?.setPitch(0.95f)
                 isReady = true
                 // 引擎就绪后执行暂存的播放请求
                 pendingStart?.let { items ->
@@ -197,9 +201,22 @@ class NewsPlayerController(context: Context) {
     }
 
     /**
-     * 格式化朗读文本
+     * 格式化朗读文本（带朗读节奏标记）
      */
     private fun formatSpeech(item: NewsItem, index: Int, total: Int): String {
-        return "第${index + 1}条，共$total 条。来自${item.source}。${item.title}。${item.summary}。"
+        return buildString {
+            // 条数信息
+            append("第${index + 1}条，共$total 条。")
+            // 来源
+            append("来自${item.source}。")
+            // 标题（稍作停顿）
+            append("${item.title}。。")
+            // 摘要（如果是最后一条，加结束语）
+            if (index == total - 1) {
+                append("${item.summary}。以上就是今天的全部 AI 资讯，感谢收听。")
+            } else {
+                append("${item.summary}。")
+            }
+        }
     }
 }

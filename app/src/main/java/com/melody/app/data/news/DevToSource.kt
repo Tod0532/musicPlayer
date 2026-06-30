@@ -47,15 +47,27 @@ object DevToSource {
                     val title = obj.optString("title", "").trim()
                     if (title.isBlank()) continue
                     val description = obj.optString("description", "").trim()
+                    val readableUrl = obj.optString("readable_url", "")
                     val url = obj.optString("url", "")
                     val publishedAt = obj.optString("published_at", "")
                     val positiveReactions = obj.optInt("positive_reactions_count", 0)
+                    val comments = obj.optInt("comments_count", 0)
+                    val readingTime = obj.optInt("reading_time_minutes", 0)
+                    val tags = obj.optString("tag_list", "").trim()
+
+                    // 增强摘要：描述 + 阅读时长 + 标签
+                    val enhancedSummary = buildString {
+                        if (description.isNotBlank()) append(description)
+                        if (readingTime > 0) append("。预计阅读${readingTime}分钟")
+                        if (positiveReactions > 0) append("，${positiveReactions}人点赞")
+                        if (comments > 0) append("，${comments}条评论")
+                    }.take(300)
 
                     result.add(
                         NewsItem(
                             id = "devto_${url.hashCode()}",
                             title = title,
-                            summary = description.ifBlank { title }.take(300),
+                            summary = enhancedSummary.ifBlank { title },
                             source = "Dev.to",
                             url = url,
                             publishedAt = parseDate(publishedAt),

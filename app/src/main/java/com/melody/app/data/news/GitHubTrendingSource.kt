@@ -45,19 +45,28 @@ object GitHubTrendingSource {
                     if (!NewsItem.isAiRelated(checkText) && language != "Python") continue
 
                     val title = "【新项目】$repoPath"
-                    val summary = if (description.isNotBlank()) description else "热门 AI 项目"
+                    val desc = if (description.isBlank()) "热门 AI 项目" else description
                     val url = "https://github.com/$repoPath"
                     val stars = parseStars(starsText)
+                    val todayStars = parseTodayStars(starsTodayText)
+
+                    // 增强摘要：描述 + 语言 + 今日 stars
+                    val enhancedSummary = buildString {
+                        append(desc)
+                        if (language.isNotBlank()) append("。语言：$language")
+                        if (stars > 0) append("，$stars stars")
+                        if (todayStars > 0) append("，今日新增 $todayStars stars")
+                    }.take(300)
 
                     result.add(
                         NewsItem(
                             id = "gh_$repoPath",
                             title = title,
-                            summary = summary,
+                            summary = enhancedSummary,
                             source = NewsItem.SOURCE_GITHUB,
                             url = url,
                             publishedAt = now,
-                            score = stars
+                            score = stars + todayStars
                         )
                     )
                 } catch (_: Exception) { /* 跳过单条 */ }
@@ -68,5 +77,14 @@ object GitHubTrendingSource {
 
     private fun parseStars(text: String): Int {
         return text.replace(",", "").replace("k", "000").toIntOrNull() ?: 0
+    }
+
+    /**
+     * 解析"今日新增 N stars today"
+     */
+    private fun parseTodayStars(text: String): Int {
+        // 格式如 "1,234 stars today"
+        val match = Regex("(\\d[\\d,]*)\\s*stars\\s*today").find(text)
+        return match?.groupValues?.get(1)?.replace(",", "")?.toIntOrNull() ?: 0
     }
 }
