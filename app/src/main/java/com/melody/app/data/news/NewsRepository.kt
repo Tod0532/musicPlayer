@@ -47,9 +47,17 @@ object NewsRepository {
         // 3. 翻译英文内容为中文
         val translated = translateItems(merged)
 
+        // 3.5 清理翻译输出（去多余空格、格式化标点）
+        val cleaned = translated.map { item ->
+            item.copy(
+                title = cleanTranslatedText(item.title),
+                summary = cleanTranslatedText(item.summary)
+            )
+        }
+
         // 4. 时效性过滤：只保留最近 48 小时的内容
         val cutoff = System.currentTimeMillis() - 48 * 3600 * 1000L
-        val fresh = translated.filter { it.publishedAt > cutoff || it.publishedAt == 0L }
+        val fresh = cleaned.filter { it.publishedAt > cutoff || it.publishedAt == 0L }
 
         // 5. 跨源去重合并：同一新闻在多个源出现时，保留质量最高的版本
         val deduplicated = mergeDuplicates(fresh)
@@ -187,56 +195,79 @@ object NewsRepository {
      */
     private fun extractCorePoint(summary: String): String {
         if (summary.isBlank()) return ""
-        // 取第一个句号/感叹号/问号前的内容
         val firstSentence = summary.split(Regex("[。！？.!?]"))[0].trim()
         return if (firstSentence.length > 10) firstSentence else summary.take(100)
     }
 
     /**
+     * 清理翻译输出
+     * - 去除多余空格（MLKit 逐词翻译会在每个词之间加空格）
+     * - 格式化标点（中英文标点统一）
+     * - 去除首尾空格
+     */
+    private fun cleanTranslatedText(text: String): String {
+        if (text.isBlank()) return text
+        var result = text
+        // 去除中文字符之间的空格（"升级 到 我们" → "升级到我们"）
+        result = result.replace(Regex("(?<=[\\u4e00-\\u9fff])\\s+(?=[\\u4e00-\\u9fff])"), "")
+        // 去除中文标点前后的空格
+        result = result.replace(Regex("\\s*([，。！？、；：])\\s*"), "$1")
+        // 去除英文标点前后的多余空格
+        result = result.replace(Regex("\\s*([,.!?;:])\\s*"), "$1 ")
+        // 去除括号内的多余空格
+        result = result.replace(Regex("\\(\\s+"), "(")
+        result = result.replace(Regex("\\s+\\)"), ")")
+        // 去除连续空格
+        result = result.replace(Regex("\\s+"), " ")
+        // 去除首尾空格
+        result = result.trim()
+        return result
+    }
+
+    /**
      * 翻译新闻列表中的英文内容
-     * 策略：LocalTranslator（本地术语字典，永远可用）优先
-     *       MLKit（需连 Google 服务器）作为补充
+     * 策略：MLKit（质量更高）优先，LocalTranslator 作为降级
      */
     private suspend fun translateItems(items: List<NewsItem>): List<NewsItem> = coroutineScope {
-        // 先用本地术语字典翻译（永远可用，无需网络）
-        val locallyTranslated = items.map { item ->
-            async {
-                val titleCn = LocalTranslator.translateEnglish(item.title)
-                val summaryCn = LocalTranslator.translateEnglish(item.summary)
-                item.copy(title = titleCn, summary = summaryCn)
-            }
-        }.awaitAll()
-
-        // 尝试 MLKit 补充（翻译本地字典没覆盖的句子）
+        // 尝试 MLKit 翻译（质量更高，逐句翻译）
         try {
             val modelReady = NewsTranslator.ensureReady()
             if (modelReady) {
-                locallyTranslated.map { item ->
+                // MLKit 翻译（并发）
+                items.map { item ->
                     async { translateItemWithMLKit(item) }
                 }.awaitAll()
             } else {
-                locallyTranslated
+                // MLKit 不可用，降级到本地术语字典
+                items.map { item ->
+                    async {
+                        val titleCn = LocalTranslator.translateEnglish(item.title)
+                        val summaryCn = LocalTranslator.translateEnglish(item.summary)
+                        item.copy(title = titleCn, summary = summaryCn)
+                    }
+                }.awaitAll()
             }
         } catch (_: Exception) {
-            // MLKit 不可用，返回本地翻译结果
-            locallyTranslated
+            // MLKit 失败，降级到本地术语字典
+            items.map { item ->
+                async {
+                    val titleCn = LocalTranslator.translateEnglish(item.title)
+                    val summaryCn = LocalTranslator.translateEnglish(item.summary)
+                    item.copy(title = titleCn, summary = summaryCn)
+                }
+            }.awaitAll()
         }
     }
 
     /**
-     * MLKit 补充翻译（仅翻译本地字典没覆盖的内容）
+     * MLKit 翻译单条新闻（质量更高）
      */
     private suspend fun translateItemWithMLKit(item: NewsItem): NewsItem {
         val title = item.title
         val summary = item.summary
 
-        val titleCn = if (LocalTranslator.isMostlyEnglish(title)) {
-            NewsTranslator.translate(title)
-        } else title
-
-        val summaryCn = if (summary != title && LocalTranslator.isMostlyEnglish(summary)) {
-            NewsTranslator.translate(summary)
-        } else summary
+        val titleCn = NewsTranslator.translate(title)
+        val summaryCn = if (summary != title) NewsTranslator.translate(summary) else summary
 
         return item.copy(title = titleCn, summary = summaryCn)
     }
