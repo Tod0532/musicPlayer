@@ -3,6 +3,12 @@ package com.melody.app.data.news
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
+import java.security.SecureRandom
+import java.security.cert.X509Certificate
+import javax.net.ssl.HttpsURLConnection
+import javax.net.ssl.SSLContext
+import javax.net.ssl.TrustManager
+import javax.net.ssl.X509TrustManager
 
 /**
  * 36kr 中文科技新闻源
@@ -18,6 +24,7 @@ object Kr36Source {
     suspend fun fetch(limit: Int = 10): List<NewsItem> = withContext(Dispatchers.IO) {
         val result = mutableListOf<NewsItem>()
         try {
+            // 直接用域名请求（不用 IP 直连，避免 SSL 证书问题）
             val conn = CustomDns.openConnection(
                 "https://36kr.com/api/newsflash?per_page=$limit",
                 timeoutMs = 10000
@@ -25,19 +32,24 @@ object Kr36Source {
             conn.requestMethod = "GET"
 
             if (conn.responseCode != 200) {
+                System.err.println("MelodyNews: 36kr HTTP ${conn.responseCode}")
                 conn.disconnect()
                 return@withContext result
             }
 
             val text = conn.inputStream.bufferedReader().use { it.readText() }
             conn.disconnect()
+            System.err.println("MelodyNews: 36kr 响应 ${text.length} 字节")
 
             val json = JSONObject(text)
-            val items = json.optJSONObject("data")?.optJSONArray("items") ?: return@withContext result
+            val items = json.optJSONObject("data")?.optJSONArray("items")
+            System.err.println("MelodyNews: 36kr items=${items?.length() ?: 0}")
+            if (items == null || items.length() == 0) return@withContext result
 
-            for (i in 0 until items.length()) {
+            val itemList = items
+            for (i in 0 until itemList.length()) {
                 if (result.size >= limit) break
-                val obj = items.getJSONObject(i)
+                val obj = itemList.getJSONObject(i)
                 val title = obj.optString("title", "").trim()
                 if (title.isBlank()) continue
 

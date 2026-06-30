@@ -11,23 +11,29 @@ import java.nio.ByteBuffer
  * 自定义 DNS 解析器 + HTTP 连接工厂
  *
  * 解决设备系统 DNS 无法解析中文域名的问题。
- * 用 UDP 直接向公共 DNS 服务器（阿里 223.5.5.5）查询，
- * 获取 IP 后用 IP 连接 HTTPS（设置 Host 头）。
+ * 策略：优先用硬编码 IP 映射（设备 ping 验证可达），降级用 UDP DNS 查询。
  */
 object CustomDns {
 
+    // 已知中文域名的 IP 映射（设备 ping 验证可达）
+    private val knownHosts = mapOf(
+        "36kr.com" to "103.143.17.146",
+        "www.jiqizhixin.com" to "39.106.131.93",
+        "www.qbitai.com" to "120.222.152.85",
+        "api.juejin.cn" to "120.223.241.97"
+    )
+
     private val DNS_SERVERS = listOf("223.5.5.5", "114.114.114.114")
-    private val dnsCache = mutableMapOf<String, String>()  // 域名 → IP 缓存
+    private val dnsCache = mutableMapOf<String, String>()
 
     /**
      * 创建使用自定义 DNS 的 HttpURLConnection
-     * 自动解析域名为 IP，用 IP 连接，设置 Host 头
+     * 先用硬编码 IP，降级用 UDP DNS，最后用系统 DNS
      */
     fun openConnection(urlString: String, timeoutMs: Int = 8000): HttpURLConnection {
         val url = URL(urlString)
         val host = url.host
 
-        // 解析域名为 IP
         val ip = resolveCached(host)
         val connectionUrl = if (ip != null) {
             urlString.replace("://$host", "://$ip")
@@ -44,19 +50,14 @@ object CustomDns {
         return conn
     }
 
-    /**
-     * 带缓存的 DNS 解析
-     */
     private fun resolveCached(host: String): String? {
         dnsCache[host]?.let { return it }
+        knownHosts[host]?.let { dnsCache[host] = it; return it }
         val ip = resolve(host)
         if (ip != null) dnsCache[host] = ip
         return ip
     }
 
-    /**
-     * 用 UDP 向公共 DNS 查询域名 IP
-     */
     private fun resolve(host: String): String? {
         for (server in DNS_SERVERS) {
             try {
@@ -74,7 +75,6 @@ object CustomDns {
             val query = buildQuery(host)
             val addr = InetAddress.getByName(dnsServer)
             socket.send(DatagramPacket(query, query.size, addr, 53))
-
             val buf = ByteArray(512)
             val resp = DatagramPacket(buf, buf.size)
             socket.receive(resp)
@@ -86,17 +86,16 @@ object CustomDns {
 
     private fun buildQuery(host: String): ByteArray {
         val bb = ByteBuffer.allocate(512)
-        bb.putShort(0x1234)  // Transaction ID
-        bb.putShort(0x0100)  // Flags
-        bb.putShort(1)       // Questions
+        bb.putShort(0x1234)
+        bb.putShort(0x0100)
+        bb.putShort(1)
         bb.putShort(0); bb.putShort(0); bb.putShort(0)
         for (part in host.split(".")) {
             bb.put(part.length.toByte())
             bb.put(part.toByteArray())
         }
         bb.put(0)
-        bb.putShort(1)  // Type A
-        bb.putShort(1)  // Class IN
+        bb.putShort(1); bb.putShort(1)
         return bb.array().sliceArray(0 until bb.position())
     }
 
@@ -104,7 +103,6 @@ object CustomDns {
         if (len < 12) return null
         val bb = ByteBuffer.wrap(data, 0, len)
         bb.position(12)
-        // Skip question
         while (bb.hasRemaining()) {
             val b = bb.get().toInt() and 0xFF
             if (b == 0) break
@@ -112,9 +110,7 @@ object CustomDns {
             bb.position(bb.position() + b)
         }
         if (bb.remaining() < 4) return null
-        bb.position(bb.position() + 4)  // QTYPE + QCLASS
-
-        // Parse answers
+        bb.position(bb.position() + 4)
         while (bb.remaining() >= 12) {
             val nameByte = bb.get().toInt() and 0xFF
             if (nameByte >= 0xC0) bb.get()
