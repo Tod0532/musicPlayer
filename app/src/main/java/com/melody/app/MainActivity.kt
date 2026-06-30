@@ -90,11 +90,12 @@ fun MelodyApp(viewModel: PlayerViewModel = viewModel()) {
         }
     }
 
-    // 启动时：已有权限则自动扫描一次
+    // 启动时：已有权限则自动扫描一次 + 抓取新闻（诊断）
     androidx.compose.runtime.LaunchedEffect(Unit) {
         if (viewModel.checkPermission()) {
             viewModel.scanLocalMusic()
         }
+        viewModel.fetchNews()
     }
 
     // 请求权限的触发函数（由 UI 按钮调用，避免启动时自动弹窗的时序问题）

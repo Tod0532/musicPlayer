@@ -23,8 +23,8 @@ object NewsRepository {
         val hnDeferred = async {
             try { HackerNewsSource.fetch() } catch (_: Exception) { emptyList() }
         }
-        val arxivDeferred = async {
-            try { ArxivSource.fetch() } catch (_: Exception) { emptyList() }
+        val anthropicDeferred = async {
+            try { AnthropicSource.fetch() } catch (_: Exception) { emptyList() }
         }
         val devtoDeferred = async {
             try { DevToSource.fetch() } catch (_: Exception) { emptyList() }
@@ -34,14 +34,14 @@ object NewsRepository {
         }
 
         val hn = hnDeferred.await()
-        val arxiv = arxivDeferred.await()
+        val anthropic = anthropicDeferred.await()
         val devto = devtoDeferred.await()
         val techMedia = techMediaDeferred.await()
 
-        System.err.println("MelodyNews: HN=${hn.size} ArXiv=${arxiv.size} DevTo=${devto.size} TechMedia=${techMedia.size}")
+        System.err.println("MelodyNews: HN=${hn.size} Anthropic=${anthropic.size} DevTo=${devto.size} TechMedia=${techMedia.size}")
 
         // 2. 合并 + 去重
-        val merged = (techMedia + hn + devto + arxiv)
+        val merged = (techMedia + hn + devto + anthropic)
             .distinctBy { normalizeTitle(it.title) }
 
         // 3. 翻译英文内容为中文
@@ -55,11 +55,12 @@ object NewsRepository {
             "WIRED",
             "VentureBeat",
             NewsItem.SOURCE_MIT,
+            // 官方动态
+            NewsItem.SOURCE_ANTHROPIC,
+            // 技术社区
             NewsItem.SOURCE_HACKERNEWS,
-            // 其次开发者内容
             NewsItem.SOURCE_DEVTO,
-            NewsItem.SOURCE_GITHUB,
-            // 最后学术
+            // 学术
             NewsItem.SOURCE_ARXIV,
             NewsItem.SOURCE_JIQIZHIXIN,
             NewsItem.SOURCE_QBITAI
@@ -82,34 +83,50 @@ object NewsRepository {
     }
 
     /**
-     * 翻译新闻列表中的英文内容（并发翻译加速）
-     * 只翻译检测为英文的标题和摘要，中文内容保持原样
+     * 翻译新闻列表中的英文内容
+     * 策略：LocalTranslator（本地术语字典，永远可用）优先
+     *       MLKit（需连 Google 服务器）作为补充
      */
     private suspend fun translateItems(items: List<NewsItem>): List<NewsItem> = coroutineScope {
-        // 确保翻译模型就绪（首次会下载，约30MB）
-        val modelReady = NewsTranslator.ensureReady()
-        if (!modelReady) return@coroutineScope items  // 模型不可用，返回原文
-
-        // 并发翻译每条（比串行快很多）
-        items.map { item ->
-            async { translateItem(item) }
+        // 先用本地术语字典翻译（永远可用，无需网络）
+        val locallyTranslated = items.map { item ->
+            async {
+                val titleCn = LocalTranslator.translateEnglish(item.title)
+                val summaryCn = LocalTranslator.translateEnglish(item.summary)
+                item.copy(title = titleCn, summary = summaryCn)
+            }
         }.awaitAll()
+
+        // 尝试 MLKit 补充（翻译本地字典没覆盖的句子）
+        try {
+            val modelReady = NewsTranslator.ensureReady()
+            if (modelReady) {
+                locallyTranslated.map { item ->
+                    async { translateItemWithMLKit(item) }
+                }.awaitAll()
+            } else {
+                locallyTranslated
+            }
+        } catch (_: Exception) {
+            // MLKit 不可用，返回本地翻译结果
+            locallyTranslated
+        }
     }
 
     /**
-     * 翻译单条新闻
+     * MLKit 补充翻译（仅翻译本地字典没覆盖的内容）
      */
-    private suspend fun translateItem(item: NewsItem): NewsItem {
-        val titleEn = item.title
-        val summaryEn = item.summary
+    private suspend fun translateItemWithMLKit(item: NewsItem): NewsItem {
+        val title = item.title
+        val summary = item.summary
 
-        val titleCn = if (NewsTranslator.isLikelyEnglish(titleEn)) {
-            NewsTranslator.translate(titleEn)
-        } else titleEn
+        val titleCn = if (LocalTranslator.isMostlyEnglish(title)) {
+            NewsTranslator.translate(title)
+        } else title
 
-        val summaryCn = if (summaryEn != titleEn && NewsTranslator.isLikelyEnglish(summaryEn)) {
-            NewsTranslator.translate(summaryEn)
-        } else summaryEn
+        val summaryCn = if (summary != title && LocalTranslator.isMostlyEnglish(summary)) {
+            NewsTranslator.translate(summary)
+        } else summary
 
         return item.copy(title = titleCn, summary = summaryCn)
     }

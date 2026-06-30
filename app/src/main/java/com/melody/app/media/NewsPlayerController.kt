@@ -194,6 +194,7 @@ class NewsPlayerController(context: Context) {
         "HackerNews" -> "黑客新闻"
         "GitHub" -> "开源项目"
         "ArXiv" -> "前沿论文"
+        "Anthropic" -> "Anthropic官方动态"
         "Dev.to" -> "技术博客"
         "TechCrunch" -> "TechCrunch科技新闻"
         "The Verge" -> "The Verge深度报道"
