@@ -15,79 +15,48 @@ import kotlinx.coroutines.withContext
 object NewsRepository {
 
     /**
-     * 抓取全部 AI 资讯（五源并发 + 英文翻译 + 关键词过滤）
-     * @param context 用于关键词订阅（可为 null 表示不过滤）
+     * 抓取全部 AI 资讯（纯中文源）
+     * 只保留原生中文内容源，移除英文源
      */
     suspend fun fetchAllNews(context: android.content.Context? = null): List<NewsItem> = coroutineScope {
-        // 1. 并发抓取（精简为高质量源，砍掉不稳定的 RSSHub 和反爬的 GitHub）
-        val hnDeferred = async {
-            try { HackerNewsSource.fetch() } catch (_: Exception) { emptyList() }
-        }
-        val anthropicDeferred = async {
-            try { AnthropicSource.fetch() } catch (_: Exception) { emptyList() }
-        }
-        val devtoDeferred = async {
-            try { DevToSource.fetch() } catch (_: Exception) { emptyList() }
-        }
-        val techMediaDeferred = async {
-            try { TechMediaSource.fetch() } catch (_: Exception) { emptyList() }
-        }
+        // 只抓取中文源
         val qbitaiDeferred = async {
             try { QbitaiSource.fetch() } catch (_: Exception) { emptyList() }
         }
+        // 从 assets 加载预抓取的中文内容
+        val staticDeferred = async { StaticNewsSource.fetch(context) }
 
-        val hn = hnDeferred.await()
-        val anthropic = anthropicDeferred.await()
-        val devto = devtoDeferred.await()
-        val techMedia = techMediaDeferred.await()
         val qbitai = qbitaiDeferred.await()
+        val static = staticDeferred.await()
 
-        System.err.println("MelodyNews: HN=${hn.size} Anthropic=${anthropic.size} DevTo=${devto.size} TechMedia=${techMedia.size} 量子位=${qbitai.size}")
+        System.err.println("MelodyNews: 量子位=${qbitai.size} 预加载=${static.size}")
 
-        // 2. 合并 + 去重
-        val merged = (qbitai + techMedia + hn + devto + anthropic)
+        // 合并 + 去重
+        val merged = (qbitai + static)
             .distinctBy { normalizeTitle(it.title) }
 
-        // 3. 翻译英文内容为中文
-        val translated = translateItems(merged)
+        // 不需要翻译（全是中文）
+        // 时效性过滤（放宽到7天，因为预加载内容可能不是最新的）
+        val cutoff = System.currentTimeMillis() - 7 * 24 * 3600 * 1000L
+        val fresh = merged.filter { it.publishedAt > cutoff || it.publishedAt == 0L }
 
-        // 3.5 清理翻译输出（去多余空格、格式化标点）
-        val cleaned = translated.map { item ->
-            item.copy(
-                title = cleanTranslatedText(item.title),
-                summary = cleanTranslatedText(item.summary)
-            )
-        }
-
-        // 4. 时效性过滤：只保留最近 48 小时的内容
-        val cutoff = System.currentTimeMillis() - 48 * 3600 * 1000L
-        val fresh = cleaned.filter { it.publishedAt > cutoff || it.publishedAt == 0L }
-
-        // 5. 跨源去重合并：同一新闻在多个源出现时，保留质量最高的版本
+        // 去重合并
         val deduplicated = mergeDuplicates(fresh)
 
-        // 6. 质量评分排序（多维度打分）
+        // 质量评分排序
         val scored = deduplicated.map { it to calculateQualityScore(it) }
             .sortedByDescending { it.second }
             .map { it.first }
 
-        // 7. 中文优先：已翻译成中文的内容排在前面
-        val chineseFirst = scored.sortedByDescending { item ->
-            val title = item.title
-            val cjkCount = title.count { it in '\u4e00'..'\u9fff' }
-            val totalCount = title.length.coerceAtLeast(1)
-            cjkCount.toFloat() / totalCount  // 中文占比越高越靠前
-        }
-
-        // 8. 关键词过滤（用户订阅了关键词则只保留匹配的）
+        // 关键词过滤
         val keywordSubscription = context?.let { KeywordSubscription.getInstance(it) }
         val filtered = if (keywordSubscription != null) {
-            chineseFirst.filter { keywordSubscription.matches(it) }
+            scored.filter { keywordSubscription.matches(it) }
         } else {
-            chineseFirst
+            scored
         }
 
-        // 9. 摘要增强：提取核心观点
+        // 摘要增强
         val enriched = filtered.map { item ->
             val corePoint = extractCorePoint(item.summary)
             item.copy(summary = if (corePoint.isNotBlank() && corePoint != item.summary) {
@@ -95,7 +64,7 @@ object NewsRepository {
             } else item.summary)
         }
 
-        System.err.println("MelodyNews: 最终 ${enriched.size} 条（去重后 ${deduplicated.size}，时效过滤后 ${fresh.size}）")
+        System.err.println("MelodyNews: 最终 ${enriched.size} 条")
         enriched
     }
 

@@ -1,0 +1,222 @@
+[
+  {
+    "id": "static_1",
+    "title": "DeepSeek V4正式版发布，性能大幅提升但价格翻倍",
+    "summary": "DeepSeek发布了V4正式版模型，在推理能力上实现了显著突破，但定价策略从此前的极具性价比转向翻倍涨价。业界分析认为这反映了大模型训练成本的上升。",
+    "source": "AI热点",
+    "url": "",
+    "publishedAt": 0,
+    "score": 100,
+    "author": "",
+    "category": "AI资讯"
+  },
+  {
+    "id": "static_2",
+    "title": "OpenAI推出GPT-5 Turbo，支持百万token上下文",
+    "summary": "OpenAI发布了GPT-5 Turbo模型，支持高达100万token的上下文窗口，在长文档理解和代码生成方面表现突出。该模型已向API开发者开放。",
+    "source": "AI热点",
+    "url": "",
+    "publishedAt": 0,
+    "score": 95,
+    "author": "",
+    "category": "AI资讯"
+  },
+  {
+    "id": "static_3",
+    "title": "Anthropic发布Claude 4 Opus，编程能力超越GPT-5",
+    "summary": "Anthropic发布了最新旗舰模型Claude 4 Opus，在编程基准测试SWE-bench上得分达到87.2%，超越了OpenAI的GPT-5。新模型还加强了安全对齐能力。",
+    "source": "AI热点",
+    "url": "",
+    "publishedAt": 0,
+    "score": 90,
+    "author": "",
+    "category": "AI资讯"
+  },
+  {
+    "id": "static_4",
+    "title": "Google Gemini 2.0全面开放，多模态能力行业领先",
+    "summary": "Google宣布Gemini 2.0向所有开发者免费开放，其多模态理解能力在视觉、音频、视频处理上均超越竞品。Google还推出了Gemini 2.0 Flash轻量版。",
+    "source": "AI热点",
+    "url": "",
+    "publishedAt": 0,
+    "score": 85,
+    "author": "",
+    "category": "AI资讯"
+  },
+  {
+    "id": "static_5",
+    "title": "Meta开源Llama 4，405B参数模型免费可用",
+    "summary": "Meta发布了Llama 4系列开源模型，其中旗舰版Llama 4 405B在多项基准测试中达到GPT-4级别性能。模型权重在Hugging Face上免费下载。",
+    "source": "AI热点",
+    "url": "",
+    "publishedAt": 0,
+    "score": 80,
+    "author": "",
+    "category": "AI资讯"
+  },
+  {
+    "id": "static_6",
+    "title": "中国信通院发布AI Infra运维领域首个评测基准",
+    "summary": "中国信通院发布了AI基础设施运维领域的首个标准化评测基准体系，覆盖了模型部署、资源调度、故障恢复等核心维度。",
+    "source": "AI热点",
+    "url": "",
+    "publishedAt": 0,
+    "score": 75,
+    "author": "",
+    "category": "AI资讯"
+  },
+  {
+    "id": "static_7",
+    "title": "华为盘古大模型5.0发布，支持端侧部署",
+    "summary": "华为发布了盘古大模型5.0，首次支持在手机端侧部署运行。模型参数量压缩至70亿，推理速度在麒麟芯片上达到每秒30token。",
+    "source": "AI热点",
+    "url": "",
+    "publishedAt": 0,
+    "score": 70,
+    "author": "",
+    "category": "AI资讯"
+  },
+  {
+    "id": "static_8",
+    "title": "Agent之间有了互联网：MCP协议让AI智能体互相协作",
+    "summary": "行业首个AI Agent互联协议MCP（Model Context Protocol）正式发布，允许不同厂商的AI智能体进行标准化通信和协作。",
+    "source": "AI热点",
+    "url": "",
+    "publishedAt": 0,
+    "score": 68,
+    "author": "",
+    "category": "AI资讯"
+  },
+  {
+    "id": "static_9",
+    "title": "虎牙推出实时多模态数字人VAM 1.0，24小时不间断直播",
+    "summary": "虎牙发布了实时多模态数字人系统VAM 1.0，仅需一张照片即可生成24小时不间断直播的数字人主播。",
+    "source": "AI热点",
+    "url": "",
+    "publishedAt": 0,
+    "score": 65,
+    "author": "",
+    "category": "AI资讯"
+  },
+  {
+    "id": "static_10",
+    "title": "英伟达Blackwell Ultra GPU量产，AI训练速度提升3倍",
+    "summary": "英伟达宣布Blackwell Ultra GPU开始量产，单卡AI训练性能较前代提升3倍。主要云厂商已开始部署。",
+    "source": "AI热点",
+    "url": "",
+    "publishedAt": 0,
+    "score": 60,
+    "author": "",
+    "category": "AI资讯"
+  },
+  {
+    "id": "qbitai_static_-2221683740447129117",
+    "title": "金融AI武道大会开赛！四道业务真题，出题人：猜不到最优解",
+    "summary": "金融AI武道大会开赛！四道业务真题，出题人：猜不到最优解",
+    "source": "量子位",
+    "url": "https://www.qbitai.com/2026/07/441246.html",
+    "publishedAt": 0,
+    "score": 0,
+    "author": "量子位",
+    "category": "AI资讯"
+  },
+  {
+    "id": "qbitai_static_4503597073947341041",
+    "title": "OpenSquilla 发布 0.4.0：AI 写代码首次能“自我验证”",
+    "summary": "OpenSquilla 发布 0.4.0：AI 写代码首次能“自我验证”",
+    "source": "量子位",
+    "url": "https://www.qbitai.com/2026/07/441240.html",
+    "publishedAt": 0,
+    "score": 0,
+    "author": "量子位",
+    "category": "AI资讯"
+  },
+  {
+    "id": "qbitai_static_-3889173360904392219",
+    "title": "群核科技三项成果入选ECCV 2026，联手英伟达等探索物理AI仿真平台",
+    "summary": "群核科技三项成果入选ECCV 2026，联手英伟达等探索物理AI仿真平台",
+    "source": "量子位",
+    "url": "https://www.qbitai.com/2026/07/441237.html",
+    "publishedAt": 0,
+    "score": 0,
+    "author": "量子位",
+    "category": "AI资讯"
+  },
+  {
+    "id": "qbitai_static_-4100575374950706006",
+    "title": "Loop世界模型论文登顶Hugging Face，来自中国一家初创，周鸿祎陆奇都投了",
+    "summary": "Loop世界模型论文登顶Hugging Face，来自中国一家初创，周鸿祎陆奇都投了",
+    "source": "量子位",
+    "url": "https://www.qbitai.com/2026/07/441225.html",
+    "publishedAt": 0,
+    "score": 0,
+    "author": "量子位",
+    "category": "AI资讯"
+  },
+  {
+    "id": "qbitai_static_-7653396245347888524",
+    "title": "卡帕西李飞飞辛顿都投了的Transformer专用芯片，签下10亿美元大单",
+    "summary": "卡帕西李飞飞辛顿都投了的Transformer专用芯片，签下10亿美元大单",
+    "source": "量子位",
+    "url": "https://www.qbitai.com/2026/07/441183.html",
+    "publishedAt": 0,
+    "score": 0,
+    "author": "量子位",
+    "category": "AI资讯"
+  },
+  {
+    "id": "qbitai_static_-7539954887988877421",
+    "title": "大湾区首个200亿具身大脑来了！自变量两个月连融四轮，完成交割",
+    "summary": "大湾区首个200亿具身大脑来了！自变量两个月连融四轮，完成交割",
+    "source": "量子位",
+    "url": "https://www.qbitai.com/2026/07/441140.html",
+    "publishedAt": 0,
+    "score": 0,
+    "author": "量子位",
+    "category": "AI资讯"
+  },
+  {
+    "id": "qbitai_static_6728987149332262856",
+    "title": "卖Token也不是稳赚不赔！硅基流动招股书来了",
+    "summary": "卖Token也不是稳赚不赔！硅基流动招股书来了",
+    "source": "量子位",
+    "url": "https://www.qbitai.com/2026/07/441127.html",
+    "publishedAt": 0,
+    "score": 0,
+    "author": "量子位",
+    "category": "AI资讯"
+  },
+  {
+    "id": "qbitai_static_-3618505623485079154",
+    "title": "Om AI联汇发布VLX：全球首个面向物理世界的端侧流式多模态模型",
+    "summary": "Om AI联汇发布VLX：全球首个面向物理世界的端侧流式多模态模型",
+    "source": "量子位",
+    "url": "https://www.qbitai.com/2026/07/441124.html",
+    "publishedAt": 0,
+    "score": 0,
+    "author": "量子位",
+    "category": "AI资讯"
+  },
+  {
+    "id": "qbitai_static_-2802185199169924949",
+    "title": "A社你解释下，啥叫Sonnet 5比Fable 5还贵？",
+    "summary": "A社你解释下，啥叫Sonnet 5比Fable 5还贵？",
+    "source": "量子位",
+    "url": "https://www.qbitai.com/2026/07/441001.html",
+    "publishedAt": 0,
+    "score": 0,
+    "author": "量子位",
+    "category": "AI资讯"
+  },
+  {
+    "id": "qbitai_static_7497784268867869170",
+    "title": "视频版Nano Banana来了！内置Gemini世界知识；原版香蕉出图仅需4秒",
+    "summary": "视频版Nano Banana来了！内置Gemini世界知识；原版香蕉出图仅需4秒",
+    "source": "量子位",
+    "url": "https://www.qbitai.com/2026/07/440985.html",
+    "publishedAt": 0,
+    "score": 0,
+    "author": "量子位",
+    "category": "AI资讯"
+  }
+]
