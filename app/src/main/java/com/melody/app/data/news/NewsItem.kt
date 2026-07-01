@@ -25,6 +25,10 @@ data class NewsItem(
         SOURCE_ARXIV -> 0xFFA78BFA         // ArXiv 紫
         SOURCE_ANTHROPIC -> 0xFFD4A574      // Anthropic 棕
         SOURCE_36KR -> 0xFF2196F3            // 36kr 蓝
+        SOURCE_ITHOME -> 0xFFE53935          // IT之家 红
+        SOURCE_IFANR -> 0xFF00BCD4           // 爱范儿 青
+        SOURCE_SSPAI -> 0xFFD32F2F           // 少数派 红橙
+        SOURCE_LEIPHONE -> 0xFF43A047        // 雷锋网 绿
         SOURCE_DEVTO -> 0xFF60A5FA          // Dev.to 蓝
         SOURCE_TECHCRUNCH -> 0xFF00D100       // TechCrunch 绿
         SOURCE_VERGE -> 0xFFE847C7            // Verge 粉
@@ -40,6 +44,10 @@ data class NewsItem(
         const val SOURCE_ARXIV = "ArXiv"
         const val SOURCE_ANTHROPIC = "Anthropic"
         const val SOURCE_36KR = "36氪"
+        const val SOURCE_ITHOME = "IT之家"
+        const val SOURCE_IFANR = "爱范儿"
+        const val SOURCE_SSPAI = "少数派"
+        const val SOURCE_LEIPHONE = "雷锋网"
         const val SOURCE_DEVTO = "Dev.to"
         const val SOURCE_TECHCRUNCH = "TechCrunch"
         const val SOURCE_VERGE = "The Verge"

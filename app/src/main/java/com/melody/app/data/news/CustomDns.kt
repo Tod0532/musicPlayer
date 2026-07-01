@@ -15,12 +15,15 @@ import java.nio.ByteBuffer
  */
 object CustomDns {
 
-    // 已知中文域名的 IP 映射（设备 ping 验证可达）
+    // 已知中文域名的 IP 映射（Python socket 解析）
     private val knownHosts = mapOf(
+        "www.qbitai.com" to "39.175.228.12",
+        "www.ithome.com" to "111.0.18.35",
+        "www.ifanr.com" to "120.232.156.193",
+        "sspai.com" to "119.23.141.248",
+        "www.leiphone.com" to "106.55.120.211",
         "36kr.com" to "103.143.17.146",
-        "www.jiqizhixin.com" to "39.106.131.93",
-        "www.qbitai.com" to "120.222.152.85",
-        "api.juejin.cn" to "120.223.241.97"
+        "www.jiqizhixin.com" to "39.106.131.93"
     )
 
     private val DNS_SERVERS = listOf("223.5.5.5", "114.114.114.114")
