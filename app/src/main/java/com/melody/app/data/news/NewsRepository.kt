@@ -230,37 +230,39 @@ object NewsRepository {
 
     /**
      * 翻译新闻列表中的英文内容
-     * 策略：MLKit（质量更高）优先，LocalTranslator 作为降级
+     * 策略：CloudTranslator（MyMemory API，国内可达）优先
+     *       LocalTranslator（本地术语字典）降级
      */
     private suspend fun translateItems(items: List<NewsItem>): List<NewsItem> = coroutineScope {
-        // 尝试 MLKit 翻译（质量更高，逐句翻译）
-        try {
-            val modelReady = NewsTranslator.ensureReady()
-            if (modelReady) {
-                // MLKit 翻译（并发）
-                items.map { item ->
-                    async { translateItemWithMLKit(item) }
-                }.awaitAll()
-            } else {
-                // MLKit 不可用，降级到本地术语字典
-                items.map { item ->
-                    async {
-                        val titleCn = LocalTranslator.translateEnglish(item.title)
-                        val summaryCn = LocalTranslator.translateEnglish(item.summary)
-                        item.copy(title = titleCn, summary = summaryCn)
-                    }
-                }.awaitAll()
-            }
-        } catch (_: Exception) {
-            // MLKit 失败，降级到本地术语字典
-            items.map { item ->
-                async {
-                    val titleCn = LocalTranslator.translateEnglish(item.title)
-                    val summaryCn = LocalTranslator.translateEnglish(item.summary)
-                    item.copy(title = titleCn, summary = summaryCn)
-                }
-            }.awaitAll()
-        }
+        items.map { item ->
+            async { translateItemWithCloud(item) }
+        }.awaitAll()
+    }
+
+    /**
+     * 用 MyMemory API 翻译（质量最高，国内可达）
+     * 失败时降级到 LocalTranslator
+     */
+    private suspend fun translateItemWithCloud(item: NewsItem): NewsItem {
+        // 中文内容不翻译
+        if (!CloudTranslator.needsTranslation(item.title)) return item
+
+        // MyMemory 翻译标题
+        val titleCn = CloudTranslator.translate(item.title)
+        // MyMemory 翻译摘要（如果与标题不同）
+        val summaryCn = if (item.summary != item.title && CloudTranslator.needsTranslation(item.summary)) {
+            CloudTranslator.translate(item.summary)
+        } else item.summary
+
+        // 如果 MyMemory 翻译失败（返回原文），降级到 LocalTranslator
+        val finalTitle = if (titleCn == item.title) {
+            LocalTranslator.translateEnglish(item.title)
+        } else titleCn
+        val finalSummary = if (summaryCn == item.summary && CloudTranslator.needsTranslation(item.summary)) {
+            LocalTranslator.translateEnglish(item.summary)
+        } else summaryCn
+
+        return item.copy(title = finalTitle, summary = finalSummary)
     }
 
     /**
