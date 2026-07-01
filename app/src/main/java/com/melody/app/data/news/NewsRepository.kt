@@ -230,39 +230,28 @@ object NewsRepository {
 
     /**
      * 翻译新闻列表中的英文内容
-     * 策略：CloudTranslator（MyMemory API，国内可达）优先
-     *       LocalTranslator（本地术语字典）降级
+     * 策略：MyMemory API 尝试（可能不可达），失败保持原文
+     * 不再用 LocalTranslator 乱翻译（半中半英比原文更难看）
      */
     private suspend fun translateItems(items: List<NewsItem>): List<NewsItem> = coroutineScope {
         items.map { item ->
-            async { translateItemWithCloud(item) }
+            async { translateItem(item) }
         }.awaitAll()
     }
 
-    /**
-     * 用 MyMemory API 翻译（质量最高，国内可达）
-     * 失败时降级到 LocalTranslator
-     */
-    private suspend fun translateItemWithCloud(item: NewsItem): NewsItem {
-        // 中文内容不翻译
+    private suspend fun translateItem(item: NewsItem): NewsItem {
+        // 中文内容不需要翻译
         if (!CloudTranslator.needsTranslation(item.title)) return item
 
-        // MyMemory 翻译标题
+        // 尝试 MyMemory API 翻译（可能不可达）
         val titleCn = CloudTranslator.translate(item.title)
-        // MyMemory 翻译摘要（如果与标题不同）
         val summaryCn = if (item.summary != item.title && CloudTranslator.needsTranslation(item.summary)) {
             CloudTranslator.translate(item.summary)
         } else item.summary
 
-        // 如果 MyMemory 翻译失败（返回原文），降级到 LocalTranslator
-        val finalTitle = if (titleCn == item.title) {
-            LocalTranslator.translateEnglish(item.title)
-        } else titleCn
-        val finalSummary = if (summaryCn == item.summary && CloudTranslator.needsTranslation(item.summary)) {
-            LocalTranslator.translateEnglish(item.summary)
-        } else summaryCn
-
-        return item.copy(title = finalTitle, summary = finalSummary)
+        // 如果 MyMemory 翻译成功了（返回值不等于原文），用翻译结果
+        // 如果失败了（返回值等于原文），保持原文，不乱翻译
+        return item.copy(title = titleCn, summary = summaryCn)
     }
 
     /**
