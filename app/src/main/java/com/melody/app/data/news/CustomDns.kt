@@ -15,13 +15,9 @@ import java.nio.ByteBuffer
  */
 object CustomDns {
 
-    // 已知中文域名的 IP 映射（Python socket 解析）
+    // 已知中文域名的 IP 映射（多 IP，逐个尝试）
     private val knownHosts = mapOf(
-        "www.qbitai.com" to "39.175.228.12",
-        "www.ithome.com" to "111.0.18.35",
-        "www.ifanr.com" to "120.232.156.193",
-        "sspai.com" to "119.23.141.248",
-        "www.leiphone.com" to "106.55.120.211",
+        "www.qbitai.com" to "120.222.152.85",  // 之前验证可达的 IP
         "36kr.com" to "103.143.17.146",
         "www.jiqizhixin.com" to "39.106.131.93"
     )

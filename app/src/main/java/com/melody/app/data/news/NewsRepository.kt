@@ -35,21 +35,17 @@ object NewsRepository {
         val qbitaiDeferred = async {
             try { QbitaiSource.fetch() } catch (_: Exception) { emptyList() }
         }
-        val chineseMediaDeferred = async {
-            try { ChineseMediaSource.fetch() } catch (_: Exception) { emptyList() }
-        }
 
         val hn = hnDeferred.await()
         val anthropic = anthropicDeferred.await()
         val devto = devtoDeferred.await()
         val techMedia = techMediaDeferred.await()
         val qbitai = qbitaiDeferred.await()
-        val chineseMedia = chineseMediaDeferred.await()
 
-        System.err.println("MelodyNews: HN=${hn.size} Anthropic=${anthropic.size} DevTo=${devto.size} TechMedia=${techMedia.size} 量子位=${qbitai.size} 中文媒体=${chineseMedia.size}")
+        System.err.println("MelodyNews: HN=${hn.size} Anthropic=${anthropic.size} DevTo=${devto.size} TechMedia=${techMedia.size} 量子位=${qbitai.size}")
 
         // 2. 合并 + 去重
-        val merged = (qbitai + chineseMedia + techMedia + hn + devto + anthropic)
+        val merged = (qbitai + techMedia + hn + devto + anthropic)
             .distinctBy { normalizeTitle(it.title) }
 
         // 3. 翻译英文内容为中文
